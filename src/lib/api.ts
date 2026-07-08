@@ -43,14 +43,19 @@ const del  = <T>(path: string)              => req<T>('DELETE', path);
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export const auth = {
+  // Check whether an admin account has already been registered.
+  // Used by the register page to block access once an admin exists.
+  adminExists:           () =>
+    get<{ exists: boolean }>('/auth/admin/exists'),
+
   adminLogin:            (username: string, password: string) =>
     post<{ token: string; role: string }>('/auth/admin/login', { username, password }),
 
   adminLoginByEmail:     (email: string, password: string) =>
-    post<{ token: string; role: string }>('/auth/admin/login', { email, password }),
+    post<{ token: string; role: string }>('/auth/admin/login', { username: email, password }),
 
   adminRegister:         (username: string, password: string, email: string) =>
-    post<{ token: string; role: string }>('/auth/admin/register', { username, password, email }),
+    post<{ token: string; role: string }>('/auth/admin/register', { username, password, email, confirmPassword: password }),
 
   // Admin forgot-password (OTP via email)
   adminForgotSendOtp:    (email: string) =>
@@ -60,7 +65,7 @@ export const auth = {
     post<{ message: string }>('/auth/admin/forgot-password/verify-otp', { email, otp }),
 
   adminForgotReset:      (email: string, newPassword: string) =>
-    post<{ message: string }>('/auth/admin/forgot-password/reset', { email, newPassword }),
+    post<{ message: string }>('/auth/admin/forgot-password/reset-password', { email, password: newPassword }),
 
   bankLogin:             (email: string, password: string) =>
     post<{ token: string; role: string; bank: Bank }>('/auth/bank/login', { email, password }),

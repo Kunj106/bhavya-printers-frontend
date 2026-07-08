@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, Link } from 'wouter';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { auth } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +38,12 @@ export default function AdminRegister() {
   const { login } = useAuth();
   const { toast } = useToast();
 
+  // ── Check whether an admin already exists ──────────────────────────────
+  const { data: existsData, isLoading: checkingExists } = useQuery({
+    queryKey: ['admin-exists'],
+    queryFn: auth.adminExists,
+  });
+
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { username: '', email: '', password: '', confirmPassword: '' },
@@ -55,10 +61,39 @@ export default function AdminRegister() {
     },
   });
 
+  // ── Still checking ───────────────────────────────────────────────────────
+  if (checkingExists) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // ── Admin already registered — block this page ──────────────────────────
+  if (existsData?.exists) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-4">
+            <ShieldCheck className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Admin already registered</h1>
+          <p className="text-muted-foreground mb-6 text-sm">
+            An admin account has already been created for Bhavya Printers. Registration is closed.
+          </p>
+          <Link href="/admin/login">
+            <Button size="lg">Go to Login</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Registration form (only shown if no admin exists yet) ───────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-4">
             <ShieldCheck className="h-8 w-8 text-primary" />
@@ -67,13 +102,9 @@ export default function AdminRegister() {
           <p className="text-muted-foreground mt-1 text-sm">Bhavya Printers Administration</p>
         </div>
 
-        {/* Form Card */}
         <div className="bg-card border border-border rounded-2xl shadow-lg p-8">
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit((d) => mutation.mutate(d))}
-              className="space-y-4"
-            >
+            <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
               <FormField
                 control={form.control}
                 name="username"
@@ -142,12 +173,7 @@ export default function AdminRegister() {
                 )}
               />
 
-              <Button
-                type="submit"
-                className="w-full mt-2"
-                size="lg"
-                disabled={mutation.isPending}
-              >
+              <Button type="submit" className="w-full mt-2" size="lg" disabled={mutation.isPending}>
                 {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create Admin Account
               </Button>
