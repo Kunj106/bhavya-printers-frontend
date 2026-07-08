@@ -81,17 +81,12 @@ export default function Landing() {
             <FeatureCard 
               icon={<Building2 className="h-8 w-8 text-primary" />}
               title="Bank-Specific Products"
-              description="From NEFT/RTGS forms to registers and branded envelopes, we stock what you need."
+              description="From NEFT/RTGS forms to registers and bank utilities, we stock what you need."
             />
             <FeatureCard 
               icon={<Truck className="h-8 w-8 text-primary" />}
               title="Fast Pan-India Delivery"
               description="Reliable shipping logistics ensuring your branch never runs out of critical supplies."
-            />
-            <FeatureCard 
-              icon={<ShieldCheck className="h-8 w-8 text-primary" />}
-              title="Secure Ordering Portal"
-              description="OTP-verified logins and strict role-based access for your procurement officers."
             />
           </div>
         </div>
