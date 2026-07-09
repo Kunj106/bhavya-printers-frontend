@@ -2,7 +2,20 @@ import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, ShoppingCart, Menu, LogOut, Package, Users, Settings, Building2, LayoutDashboard, ShieldCheck } from 'lucide-react';
+import {
+  Moon,
+  Sun,
+  ShoppingCart,
+  Menu,
+  LogOut,
+  Package,
+  Users,
+  Settings,
+  Building2,
+  LayoutDashboard,
+  ShieldCheck,
+  FileText
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
@@ -42,12 +55,36 @@ export function Navbar() {
           <Link href="/admin/banks" className={`text-sm font-medium transition-colors hover:text-primary ${location.startsWith('/admin/banks') ? 'text-primary' : 'text-muted-foreground'}`}>
             Banks
           </Link>
-          <Link href="/admin/orders" className={`text-sm font-medium transition-colors hover:text-primary ${location.startsWith('/admin/orders') ? 'text-primary' : 'text-muted-foreground'}`}>
-            Orders
-          </Link>
-          <Link href="/admin/settings" className={`text-sm font-medium transition-colors hover:text-primary ${location === '/admin/settings' ? 'text-primary' : 'text-muted-foreground'}`}>
-            Settings
-          </Link>
+          <Link
+           href="/admin/orders"
+           className={`text-sm font-medium transition-colors hover:text-primary ${
+           location.startsWith('/admin/orders')
+           ? 'text-primary'
+           : 'text-muted-foreground'
+          }`}
+          >
+          Orders
+         </Link>
+         <Link
+         href="/admin/reports"
+         className={`text-sm font-medium transition-colors hover:text-primary ${
+         location.startsWith('/admin/reports')
+          ? 'text-primary'
+         : 'text-muted-foreground'
+          }`}
+           >
+          Reports
+         </Link>
+         <Link
+         href="/admin/settings"
+          className={`text-sm font-medium transition-colors hover:text-primary ${
+          location === '/admin/settings'
+         ? 'text-primary'
+         : 'text-muted-foreground'
+         }`}
+         >
+         Settings
+        </Link>
         </>
       )}
     </>

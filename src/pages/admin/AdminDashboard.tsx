@@ -2,6 +2,11 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { analytics, MONTH_NAMES } from '@/lib/api';
 import { formatRupee } from '@/lib/utils';
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Download, Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -39,9 +44,9 @@ export default function AdminDashboard() {
     queryKey: ['analytics', 'top-banks'],
     queryFn: analytics.topBanks,
   });
-  const { data: monthlyGst, isLoading: gstLoading } = useQuery({
-    queryKey: ['analytics', 'monthly-gst'],
-    queryFn: analytics.monthlyGst,
+ const { data: monthlyGst, isLoading: gstLoading } = useQuery({
+  queryKey: ['analytics', 'monthly-gst'],
+  queryFn: analytics.monthlyGst,
   });
 
   const revenueChartData = (revenue ?? [])
@@ -53,11 +58,92 @@ export default function AdminDashboard() {
       Orders: r.orderCount,
     }));
 
-  const topBanksData = (topBanks ?? []).slice(0, 8).map((b) => ({
-    name: b.bankName.length > 14 ? b.bankName.slice(0, 14) + '…' : b.bankName,
+  const topBanksData = (topBanks ?? []).map((b) => ({
+    name: b.bankName,
     Spend: b.totalSpend,
     Orders: b.orderCount,
-  }));
+}));
+
+   const totalTaxable =
+  (monthlyGst ?? []).reduce(
+    (sum, order) => sum + order.taxableAmount,
+    0
+  );
+
+  const totalGST =
+  (monthlyGst ?? []).reduce(
+    (sum, order) => sum + order.gstAmount,
+    0
+  );
+
+  const grandTotal =
+  (monthlyGst ?? []).reduce(
+    (sum, order) => sum + order.totalAmount,
+    0
+   );
+
+   const downloadGSTReport = () => {
+
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+
+    doc.text("Bhavya Printers", 14, 15);
+
+    doc.setFontSize(12);
+
+    doc.text("GST Collection Report", 14, 24);
+
+    autoTable(doc, {
+
+        head: [[
+            "Order ID",
+            "Bank",
+            "Taxable",
+            "GST",
+            "Total"
+        ]],
+
+        body: (monthlyGst ?? []).map(order => [
+
+            order.orderId,
+
+            order.bankName,
+
+            formatRupee(order.taxableAmount),
+
+            formatRupee(order.gstAmount),
+
+            formatRupee(order.totalAmount)
+
+        ]),
+
+        foot: [[
+            "",
+            "TOTAL",
+
+            formatRupee(totalTaxable),
+
+            formatRupee(totalGST),
+
+            formatRupee(grandTotal)
+        ]],
+
+        startY: 32
+
+    });
+
+    doc.save("GST_Report.pdf");
+
+};
+
+const printGSTReport = () => {
+
+    window.print();
+
+};
+
+
 
   if (statsLoading) {
     return (
@@ -120,6 +206,40 @@ export default function AdminDashboard() {
         )}
       </div>
 
+      <div className="mt-4">
+    <table className="w-full text-sm">
+        <thead>
+            <tr>
+                <th className="text-left">Bank</th>
+                <th className="text-right">Orders</th>
+                <th className="text-right">Spend</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {topBanksData.map((bank) => (
+
+                <tr key={bank.name}>
+
+                    <td>{bank.name}</td>
+
+                    <td className="text-right">
+                        {bank.Orders}
+                    </td>
+
+                    <td className="text-right font-semibold">
+                        {formatRupee(bank.Spend)}
+                    </td>
+
+                </tr>
+
+            ))}
+
+        </tbody>
+    </table>
+</div>
+
       {/* Top Banks */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
@@ -143,10 +263,47 @@ export default function AdminDashboard() {
           )}
         </div>
 
+        
+
         {/* Monthly GST Table */}
         <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold mb-1">Monthly GST Summary</h2>
-          <p className="text-sm text-muted-foreground mb-4">Collected GST breakdown</p>
+          <div className="flex items-center justify-between mb-4">
+
+    <div>
+
+        <h2 className="text-lg font-semibold">
+            Monthly GST Summary
+        </h2>
+
+        <p className="text-sm text-muted-foreground">
+            Collected GST breakdown
+        </p>
+
+    </div>
+
+    <div className="flex gap-2">
+
+        <Button
+            size="sm"
+            variant="outline"
+            onClick={downloadGSTReport}
+        >
+            <Download className="mr-2 h-4 w-4"/>
+            PDF
+        </Button>
+
+        <Button
+            size="sm"
+            variant="outline"
+            onClick={() => window.print()}
+        >
+            <Printer className="mr-2 h-4 w-4"/>
+            Print
+        </Button>
+
+    </div>
+
+</div>
           {gstLoading ? (
             <div className="h-48 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
@@ -154,21 +311,43 @@ export default function AdminDashboard() {
               <table className="w-full text-xs text-left">
                 <thead className="sticky top-0 bg-muted/50 text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2 font-semibold">Month</th>
+                    <th className="px-3 py-2 font-semibold">OrderId</th>
+                    <th className="px-3 py-2 font-semibold text-right">Bank</th>
                     <th className="px-3 py-2 font-semibold text-right">Taxable</th>
-                    <th className="px-3 py-2 font-semibold text-right">Total GST</th>
-                    <th className="px-3 py-2 font-semibold text-right">Orders</th>
+                    <th className="px-3 py-2 font-semibold text-right">GST</th>
+                    <th className="px-3 py-2 font-semibold text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(monthlyGst ?? []).slice(-6).reverse().map((g, i) => (
-                    <tr key={i} className="border-t border-border hover:bg-muted/30 transition-colors">
-                      <td className="px-3 py-2">{MONTH_NAMES[g.month]} {g.year}</td>
-                      <td className="px-3 py-2 text-right">{formatRupee(g.taxableAmount)}</td>
-                      <td className="px-3 py-2 text-right text-primary font-medium">{formatRupee(g.totalGst)}</td>
-                      <td className="px-3 py-2 text-right">{g.orderCount}</td>
-                    </tr>
+                  {(monthlyGst ?? []).map((order) => (
+                   <tr key={order.orderId}>
+                   <td>#ORD-{order.orderId}</td>
+                  <td>{order.bankName}</td>
+                  <td className="text-right">
+                  {formatRupee(order.taxableAmount)}
+                  </td>
+                  <td className="text-right">
+                  {formatRupee(order.gstAmount)}
+                  </td>
+                  <td className="text-right font-semibold">
+                  {formatRupee(order.totalAmount)}
+                  </td>
+                  </tr>
                   ))}
+                 <tr className="border-t-2 font-bold bg-muted">
+                 <td colSpan={2}>
+                 TOTAL
+                 </td>
+                <td className="text-right">
+                {formatRupee(totalTaxable)}
+                </td>
+                <td className="text-right">
+                {formatRupee(totalGST)}
+                </td>
+                <td className="text-right">
+                {formatRupee(grandTotal)}
+                </td>
+                </tr>
                 </tbody>
               </table>
             </div>

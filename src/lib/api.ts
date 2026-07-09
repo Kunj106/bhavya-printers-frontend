@@ -147,10 +147,13 @@ export interface VerifyPaymentInput {
 // ─── Analytics ───────────────────────────────────────────────────────────────
 
 export const analytics = {
-  dashboard:    () => get<DashboardStats>('/analytics/dashboard'),
-  revenue:      () => get<MonthlyRevenue[]>('/analytics/revenue'),
-  topBanks:     () => get<TopBank[]>('/analytics/top-banks'),
-  monthlyGst:   () => get<MonthlyGst[]>('/analytics/monthly-gst'),
+  dashboard: () => get<DashboardStats>('/analytics/dashboard'),
+
+  revenue: () => get<MonthlyRevenue[]>('/analytics/revenue'),
+
+  topBanks: () => get<TopBank[]>('/analytics/top-banks'),
+
+  monthlyGst: () => get<OrderGst[]>('/analytics/monthly-gst'),
 };
 
 // ─── Settings ────────────────────────────────────────────────────────────────
@@ -277,14 +280,13 @@ export interface MonthlyRevenue {
   gstCollected: number;
 }
 
-export interface MonthlyGst {
-  month: number;
-  year: number;
+export interface OrderGst {
+  orderId: number;
+  bankName: string;
   taxableAmount: number;
-  gst12Amount: number;
-  gst18Amount: number;
-  totalGst: number;
-  orderCount: number;
+  gstAmount: number;
+  totalAmount: number;
+  createdAt: string;
 }
 
 export interface TopBank {

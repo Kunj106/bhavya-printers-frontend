@@ -8,6 +8,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
+import AdminReports from '@/pages/admin/AdminReports';
 
 // Public pages
 import Landing from '@/pages/Landing';
@@ -21,12 +22,12 @@ import PlaceOrder from '@/pages/bank/PlaceOrder';
 import OrderDetail from '@/pages/bank/OrderDetail';
 
 // Admin pages
-import AdminLogin from '@/pages/admin/AdminLogin';
-import AdminRegister from '@/pages/admin/AdminRegister';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminProducts from '@/pages/admin/AdminProducts';
 import AdminBanks from '@/pages/admin/AdminBanks';
 import AdminOrders from '@/pages/admin/AdminOrders';
+import AdminReports from '@/pages/admin/AdminReports';
+import AdminGstReport from '@/pages/admin/AdminGstReport';
 import AdminSettings from '@/pages/admin/AdminSettings';
 
 const queryClient = new QueryClient({
@@ -75,6 +76,12 @@ function Router() {
           </Route>
           <Route path="/admin/orders">
             <ProtectedRoute role="admin" component={AdminOrders} />
+          </Route>
+          <Route path="/admin/reports">
+          <ProtectedRoute role="admin" component={AdminReports} />
+          </Route>
+          <Route path="/admin/reports/gst">
+          <ProtectedRoute role="admin" component={AdminGstReport} />
           </Route>
           <Route path="/admin/settings">
             <ProtectedRoute role="admin" component={AdminSettings} />
