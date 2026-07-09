@@ -6,8 +6,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
 import { Download, Printer } from "lucide-react";
-export default function AdminGstReport() {
 
+export default function AdminGstReport() {
   const { data: gstOrders, isLoading } = useQuery({
     queryKey: ["analytics", "monthly-gst"],
     queryFn: analytics.monthlyGst,
@@ -21,103 +21,102 @@ export default function AdminGstReport() {
     );
   }
 
-  const totalTaxable =
-    (gstOrders ?? []).reduce(
-      (sum, order) => sum + order.taxableAmount,
-      0
-    );
+  const totalTaxable = (gstOrders ?? []).reduce(
+    (sum, order) => sum + order.taxableAmount,
+    0
+  );
 
-  const totalGST =
-    (gstOrders ?? []).reduce(
-      (sum, order) => sum + order.gstAmount,
-      0
-    );
+  const totalGST = (gstOrders ?? []).reduce(
+    (sum, order) => sum + order.gstAmount,
+    0
+  );
 
-  const grandTotal =
-    (gstOrders ?? []).reduce(
-      (sum, order) => sum + order.totalAmount,
-      0
-    );
+  const grandTotal = (gstOrders ?? []).reduce(
+    (sum, order) => sum + order.totalAmount,
+    0
+  );
 
-    const downloadGSTReport = () => {
-  const doc = new jsPDF();
-
-  doc.setFontSize(18);
-  doc.text("Bhavya Printers", 14, 15);
-
-  doc.setFontSize(12);
-  doc.text("GST Collection Report", 14, 24);
-
-  autoTable(doc, {
-    head: [["Order ID", "Bank", "Taxable", "GST", "Total"]],
-    body: (gstOrders ?? []).map((order) => [
-      `ORD-${String(order.orderId).padStart(4, "0")}`,
-      order.bankName,
-      formatRupee(order.taxableAmount),
-      formatRupee(order.gstAmount),
-      formatRupee(order.totalAmount),
-    ]),
-    foot: [[
-      "",
-      "TOTAL",
-      formatRupee(totalTaxable),
-      formatRupee(totalGST),
-      formatRupee(grandTotal),
-    ]],
-    startY: 32,
+  const generatedOn = new Date().toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
   });
 
-  doc.save("Bhavya_Printers_GST_Report.pdf");
-};
+  const downloadGSTReport = () => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text("Bhavya Printers", 14, 15);
+
+    doc.setFontSize(12);
+    doc.text("GST Collection Report", 14, 24);
+
+    autoTable(doc, {
+      head: [["Order ID", "Bank", "Taxable", "GST", "Total"]],
+      body: (gstOrders ?? []).map((order) => [
+        `ORD-${String(order.orderId).padStart(4, "0")}`,
+        order.bankName,
+        formatRupee(order.taxableAmount),
+        formatRupee(order.gstAmount),
+        formatRupee(order.totalAmount),
+      ]),
+      foot: [[
+        "",
+        "TOTAL",
+        formatRupee(totalTaxable),
+        formatRupee(totalGST),
+        formatRupee(grandTotal),
+      ]],
+      startY: 32,
+    });
+
+    doc.save("Bhavya_Printers_GST_Report.pdf");
+  };
 
   const printGSTReport = () => {
-  window.print();
-};
-
-   const generatedOn = new Date().toLocaleString("en-IN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+    window.print();
+  };
 
   return (
-    <div className="flex justify-between items-start mb-8">
+    <div className="flex-1 p-6 lg:p-10 max-w-7xl mx-auto w-full">
 
-  <div>
+      <div className="flex justify-between items-start mb-8">
 
-    <h1 className="text-3xl font-bold">
-      Bhavya Printers
-    </h1>
+        <div>
 
-    <h2 className="text-xl font-semibold mt-1">
-      GST Collection Report
-    </h2>
+          <h1 className="text-3xl font-bold">
+            Bhavya Printers
+          </h1>
 
-    <p className="text-muted-foreground mt-2">
-      Generated on {generatedOn}
-    </p>
+          <h2 className="text-xl font-semibold mt-2">
+            GST Collection Report
+          </h2>
 
-  </div>
+          <p className="text-muted-foreground mt-2">
+            Generated on {generatedOn}
+          </p>
 
-  <div className="flex gap-3 print:hidden">
+        </div>
 
-    <Button
-      variant="outline"
-      onClick={downloadGSTReport}
-    >
-      <Download className="mr-2 h-4 w-4"/>
-      Download PDF
-    </Button>
+        <div className="flex gap-3 print:hidden">
 
-    <Button
-      onClick={printGSTReport}
-    >
-      <Printer className="mr-2 h-4 w-4"/>
-      Print
-    </Button>
+          <Button
+            variant="outline"
+            onClick={downloadGSTReport}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download PDF
+          </Button>
 
-  </div>
+          <Button
+            onClick={printGSTReport}
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            Print
+          </Button>
 
-</div>
+        </div>
+
+      </div>
 
       <div className="overflow-x-auto border rounded-lg">
 
@@ -125,34 +124,35 @@ export default function AdminGstReport() {
 
           <thead className="bg-muted">
 
-            <tr className="border-t-2 bg-primary/5 font-bold">
+            <tr>
 
-    <td
-      colSpan={2}
-      className="px-4 py-4"
-    >
-      GRAND TOTAL
-    </td>
+              <th className="px-4 py-3 text-left">
+                Order ID
+              </th>
 
-    <td className="px-4 py-4 text-right">
-      {formatRupee(totalTaxable)}
-    </td>
+              <th className="px-4 py-3 text-left">
+                Bank
+              </th>
 
-    <td className="px-4 py-4 text-right text-primary">
-      {formatRupee(totalGST)}
-    </td>
+              <th className="px-4 py-3 text-right">
+                Taxable
+              </th>
 
-    <td className="px-4 py-4 text-right">
-      {formatRupee(grandTotal)}
-    </td>
+              <th className="px-4 py-3 text-right">
+                GST
+              </th>
 
-</tr>
+              <th className="px-4 py-3 text-right">
+                Total
+              </th>
+
+            </tr>
 
           </thead>
 
           <tbody>
 
-            {(gstOrders ?? []).map(order => (
+            {(gstOrders ?? []).map((order) => (
 
               <tr
                 key={order.orderId}
@@ -183,21 +183,24 @@ export default function AdminGstReport() {
 
             ))}
 
-            <tr className="border-t-2 bg-muted font-bold">
+            <tr className="border-t-2 bg-primary/5 font-bold">
 
-              <td colSpan={2}>
-                TOTAL
+              <td
+                colSpan={2}
+                className="px-4 py-4"
+              >
+                GRAND TOTAL
               </td>
 
-              <td className="text-right">
+              <td className="px-4 py-4 text-right">
                 {formatRupee(totalTaxable)}
               </td>
 
-              <td className="text-right">
+              <td className="px-4 py-4 text-right text-primary">
                 {formatRupee(totalGST)}
               </td>
 
-              <td className="text-right">
+              <td className="px-4 py-4 text-right">
                 {formatRupee(grandTotal)}
               </td>
 
