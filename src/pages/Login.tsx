@@ -8,6 +8,7 @@ import { auth } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, Loader2 } from 'lucide-react';
@@ -36,11 +37,11 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { login } = useAuth();
   const { toast } = useToast();
-  
+
   const [activeTab, setActiveTab] = useState('password');
   const [forgotPasswordStep, setForgotPasswordStep] = useState<0 | 1 | 2 | 3>(0);
   // 0 = no forgot password, 1 = enter email, 2 = enter otp, 3 = enter new password
-  
+
   const [otpEmail, setOtpEmail] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
 
@@ -193,7 +194,7 @@ export default function Login() {
                 <FormField control={forgotResetForm.control} name="newPassword" render={({ field }) => (
                   <FormItem>
                     <FormLabel>New Password</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                    <FormControl><PasswordInput placeholder="••••••••" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -241,7 +242,7 @@ export default function Login() {
                 <FormField control={passwordForm.control} name="password" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Password</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                    <FormControl><PasswordInput placeholder="••••••••" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, ShieldCheck, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -276,8 +277,7 @@ export default function AdminLogin() {
                       <FormItem>
                         <FormLabel>New Password</FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
+                          <PasswordInput
                             placeholder="Min. 8 characters"
                             autoComplete="new-password"
                             {...field}
@@ -294,8 +294,7 @@ export default function AdminLogin() {
                       <FormItem>
                         <FormLabel>Confirm Password</FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
+                          <PasswordInput
                             placeholder="Repeat new password"
                             autoComplete="new-password"
                             {...field}
@@ -399,8 +398,7 @@ export default function AdminLogin() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
+                          <PasswordInput
                             placeholder="••••••••"
                             autoComplete="current-password"
                             {...field}
@@ -471,8 +469,7 @@ export default function AdminLogin() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
+                          <PasswordInput
                             placeholder="••••••••"
                             autoComplete="current-password"
                             {...field}
