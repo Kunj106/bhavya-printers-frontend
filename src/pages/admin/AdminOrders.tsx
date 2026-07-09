@@ -1,14 +1,29 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { orders, ORDER_STATUSES } from '@/lib/api';
+import { orders, payments, ORDER_STATUSES } from '@/lib/api';
 import { formatRupee } from '@/lib/utils';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ShoppingBag, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, ShoppingBag, Search, ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
+
+function PaymentStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
+    Paid: { label: 'Paid', className: 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20', icon: <CheckCircle2 className="h-3 w-3" /> },
+    Failed: { label: 'Failed', className: 'bg-red-500/10 text-red-500 ring-red-500/20', icon: <XCircle className="h-3 w-3" /> },
+    Pending: { label: 'Pending', className: 'bg-amber-500/10 text-amber-500 ring-amber-500/20', icon: <Clock className="h-3 w-3" /> },
+  };
+  const cfg = map[status] ?? map.Pending;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${cfg.className}`}>
+      {cfg.icon}
+      {cfg.label}
+    </span>
+  );
+}
 
 export default function AdminOrders() {
   const { data: list, isLoading } = useQuery({ queryKey: ['orders'], queryFn: orders.list });
@@ -18,6 +33,7 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [markingPaidId, setMarkingPaidId] = useState<number | null>(null);
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => orders.updateStatus(id, status),
@@ -28,6 +44,19 @@ export default function AdminOrders() {
     },
     onError: (e: Error) => {
       setUpdatingId(null);
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    },
+  });
+
+  const markPaid = useMutation({
+    mutationFn: (id: number) => payments.markPaidManually(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      setMarkingPaidId(null);
+      toast({ title: 'Marked as paid' });
+    },
+    onError: (e: Error) => {
+      setMarkingPaidId(null);
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     },
   });
@@ -85,6 +114,7 @@ export default function AdminOrders() {
                   <th className="px-4 py-3 font-semibold">Date</th>
                   <th className="px-4 py-3 font-semibold text-right">Total</th>
                   <th className="px-4 py-3 font-semibold">Payment</th>
+                  <th className="px-4 py-3 font-semibold">Payment Status</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                 </tr>
               </thead>
@@ -111,7 +141,26 @@ export default function AdminOrders() {
                         {o.createdAt ? format(new Date(o.createdAt), 'dd MMM yyyy') : '—'}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{formatRupee(o.total)}</td>
-                      <td className="px-4 py-3 text-muted-foreground capitalize">{o.paymentMethod}</td>
+                      <td className="px-4 py-3 text-muted-foreground uppercase text-xs font-medium">{o.paymentMethod}</td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          <PaymentStatusBadge status={o.paymentStatus} />
+                          {o.paymentMethod === 'COD' && o.paymentStatus !== 'Paid' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2 text-[11px]"
+                              disabled={markingPaidId === o.id}
+                              onClick={() => {
+                                setMarkingPaidId(o.id);
+                                markPaid.mutate(o.id);
+                              }}
+                            >
+                              {markingPaidId === o.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Mark Paid'}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <Select
                           value={o.status}
@@ -137,7 +186,7 @@ export default function AdminOrders() {
                     </tr>
                     {expandedId === o.id && (
                       <tr className="bg-muted/20 border-t border-dashed border-border">
-                        <td colSpan={7} className="px-6 py-4">
+                        <td colSpan={8} className="px-6 py-4">
                           <div className="space-y-3">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Order Items</p>
                             <div className="space-y-1">

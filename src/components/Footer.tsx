@@ -3,7 +3,7 @@ import { Link } from 'wouter';
 
 export function Footer() {
   return (
-    <footer className="border-t bg-card py-12 md:py-16">
+    <footer className="border-t bg-card py-12 md:py-16 print:hidden">
       <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-start gap-8">
         <div className="flex flex-col max-w-sm">
           <Link href="/" className="flex flex-col mb-4">
@@ -11,7 +11,7 @@ export function Footer() {
             <span className="text-xs text-muted-foreground font-semibold tracking-widest uppercase mt-1">Est. 1996 · Bharuch, Gujarat</span>
           </Link>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Trusted stationery partner for Indian banks since 1996. Delivering precision, quality, and compliance in every order.
+            Trusted stationery partner for Indian banks since 1996. Delivering precision, quality, and compliance in every order. 
           </p>
           <div className="mt-6 flex items-center gap-2">
             <span className="inline-flex items-center rounded-md bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-500 ring-1 ring-inset ring-green-500/20">

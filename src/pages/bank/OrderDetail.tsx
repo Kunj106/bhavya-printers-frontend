@@ -5,18 +5,41 @@ import { orders } from '@/lib/api';
 import { formatRupee } from '@/lib/utils';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Printer, ArrowLeft, Building2, FileText } from 'lucide-react';
+import { Loader2, Printer, ArrowLeft, Building2, FileText, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
+
+function PaymentStatusPill({ status }: { status: string }) {
+  const map: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
+    Paid: { label: 'Paid', className: 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+    Failed: { label: 'Payment Failed', className: 'bg-red-500/10 text-red-500 ring-red-500/20', icon: <XCircle className="h-3.5 w-3.5" /> },
+    Pending: { label: 'Payment Pending', className: 'bg-amber-500/10 text-amber-500 ring-amber-500/20', icon: <Clock className="h-3.5 w-3.5" /> },
+  };
+  const cfg = map[status] ?? map.Pending;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${cfg.className}`}>
+      {cfg.icon}
+      {cfg.label}
+    </span>
+  );
+}
 
 export default function OrderDetail() {
   const [, params] = useRoute('/orders/:id');
   const id = Number(params?.id);
   const printRef = useRef<HTMLDivElement>(null);
 
+  // Read the ?payment= query param set right after checkout, purely to
+  // decide which banner to show immediately. The actual source of truth
+  // is always order.paymentStatus from the server, refetched below.
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const paymentParam = searchParams?.get('payment'); // 'success' | 'failed' | 'cod' | null
+
   const { data: order, isLoading } = useQuery({
     queryKey: ['orders', id],
     queryFn: () => orders.get(id),
     enabled: !!id,
+    // Poll briefly right after checkout in case the webhook hasn't landed yet.
+    refetchInterval: paymentParam === 'success' ? 2000 : false,
   });
 
   const handlePrint = () => window.print();
@@ -37,6 +60,37 @@ export default function OrderDetail() {
 
   return (
     <div className="flex-1 p-6 lg:p-10 max-w-4xl mx-auto w-full">
+      {/* Post-checkout banner */}
+      {paymentParam === 'success' && (
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 print:hidden">
+          <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-emerald-500">Order placed successfully!</p>
+            <p className="text-sm text-muted-foreground">
+              {order.paymentStatus === 'Paid' ? 'Your payment has been confirmed.' : 'Confirming your payment — this usually takes a few seconds.'}
+            </p>
+          </div>
+        </div>
+      )}
+      {paymentParam === 'failed' && (
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 print:hidden">
+          <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-red-500">Payment failed or was cancelled</p>
+            <p className="text-sm text-muted-foreground">Your order was saved, but payment hasn't gone through yet. Please retry.</p>
+          </div>
+        </div>
+      )}
+      {paymentParam === 'cod' && (
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 print:hidden">
+          <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-primary">Order placed successfully!</p>
+            <p className="text-sm text-muted-foreground">Payment will be collected after delivery.</p>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center justify-between gap-4 mb-6 print:hidden">
         <Link href="/dashboard">
@@ -45,6 +99,7 @@ export default function OrderDetail() {
           </Button>
         </Link>
         <div className="flex items-center gap-3">
+          <PaymentStatusPill status={order.paymentStatus} />
           <StatusBadge status={order.status} />
           <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
             <Printer className="h-4 w-4" /> Print Invoice
@@ -86,6 +141,7 @@ export default function OrderDetail() {
               <div><span className="text-muted-foreground">GST No: </span><span className="font-mono font-medium text-foreground">{order.gstNo}</span></div>
               <div><span className="text-muted-foreground">PAN No: </span><span className="font-mono font-medium text-foreground">{order.panNo}</span></div>
               <div><span className="text-muted-foreground">Payment: </span><span className="capitalize text-foreground">{order.paymentMethod}</span></div>
+              <div><span className="text-muted-foreground">Payment Status: </span><span className="text-foreground">{order.paymentStatus}</span></div>
               {order.upiId && <div><span className="text-muted-foreground">UPI: </span><span className="text-foreground">{order.upiId}</span></div>}
             </div>
           </div>

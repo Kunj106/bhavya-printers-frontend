@@ -72,7 +72,7 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <FeatureCard 
               icon={<FileText className="h-8 w-8 text-primary" />}
               title="GST Compliant Invoicing"

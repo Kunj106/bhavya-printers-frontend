@@ -1,17 +1,34 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { products, orders, settings, OrderInput } from '@/lib/api';
+import { products, orders, settings, payments, OrderInput } from '@/lib/api';
 import { formatRupee } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Plus, Minus, ShoppingCart, CheckCircle, ChevronRight } from 'lucide-react';
+import { Loader2, Plus, Minus, ShoppingCart, CheckCircle, ChevronRight, Landmark, Truck } from 'lucide-react';
 
 type CartItem = { productId: number; name: string; price: number; quantity: number };
+type PaymentMethod = 'upi' | 'netbanking' | 'cod';
+type NetbankingBank = 'SBI' | 'BOB';
 
 const STEPS = ['Select Products', 'Review Details', 'Payment'];
+
+// Loads the Razorpay Checkout script once, on demand.
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 export default function PlaceOrder() {
   const { bank } = useAuth();
@@ -19,7 +36,9 @@ export default function PlaceOrder() {
   const { toast } = useToast();
   const [step, setStep] = useState(0);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'cheque'>('upi');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
+  const [netbankingBank, setNetbankingBank] = useState<NetbankingBank>('SBI');
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   const { data: productList, isLoading: prodLoading } = useQuery({ queryKey: ['products'], queryFn: products.list });
   const { data: appSettings } = useQuery({ queryKey: ['settings'], queryFn: settings.get });
@@ -45,30 +64,147 @@ export default function PlaceOrder() {
 
   const createMutation = useMutation({
     mutationFn: (input: OrderInput) => orders.create(input),
-    onSuccess: (order) => {
-      toast({ title: 'Order placed successfully!', description: `Order #${order.id} has been submitted.` });
-      setLocation('/dashboard');
-    },
     onError: (e: Error) => toast({ title: 'Failed to place order', description: e.message, variant: 'destructive' }),
   });
 
-  const submitOrder = () => {
+  // ── Pay after Delivery: no gateway involved, order goes straight through. ──
+  const submitCodOrder = () => {
     if (!bank) return;
-    createMutation.mutate({
-      bankId: bank.id,
-      bankName: bank.bankName,
-      branchName: bank.branchName,
-      gstNo: bank.gstNo,
-      panNo: bank.panNo,
-      address: bank.address,
-      mobile: bank.mobile,
-      email: bank.email,
-      items: cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-      gstRate,
-      paymentMethod,
-      upiId: paymentMethod === 'upi' ? appSettings?.upiId : undefined,
-    });
+    createMutation.mutate(
+      {
+        bankId: bank.id,
+        bankName: bank.bankName,
+        branchName: bank.branchName,
+        gstNo: bank.gstNo,
+        panNo: bank.panNo,
+        address: bank.address,
+        mobile: bank.mobile,
+        email: bank.email,
+        items: cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        gstRate,
+        paymentMethod: 'COD',
+      },
+      {
+        onSuccess: (order) => {
+          toast({ title: 'Order placed successfully!', description: `Order #${order.id} — pay on delivery.` });
+          setLocation(`/orders/${order.id}?payment=cod`);
+        },
+      }
+    );
   };
+
+  // ── UPI / Netbanking: create order first, then open Razorpay Checkout. ──
+  const submitGatewayOrder = async () => {
+    if (!bank) return;
+    setProcessingPayment(true);
+
+    try {
+      const order = await new Promise<Awaited<ReturnType<typeof orders.create>>>((resolve, reject) => {
+        createMutation.mutate(
+          {
+            bankId: bank.id,
+            bankName: bank.bankName,
+            branchName: bank.branchName,
+            gstNo: bank.gstNo,
+            panNo: bank.panNo,
+            address: bank.address,
+            mobile: bank.mobile,
+            email: bank.email,
+            items: cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+            gstRate,
+            paymentMethod: paymentMethod === 'upi' ? 'UPI' : 'NETBANKING',
+            upiId: paymentMethod === 'upi' ? appSettings?.upiId : undefined,
+          },
+          { onSuccess: resolve, onError: reject }
+        );
+      });
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast({ title: 'Could not load payment gateway', description: 'Check your internet connection and try again.', variant: 'destructive' });
+        setProcessingPayment(false);
+        setLocation(`/orders/${order.id}?payment=failed`);
+        return;
+      }
+
+      const paymentOrder = await payments.createPaymentOrder(order.id);
+
+      const options: any = {
+        key: paymentOrder.keyId,
+        amount: paymentOrder.amount,
+        currency: paymentOrder.currency,
+        name: 'Bhavya Printers',
+        description: `Order #${order.id}`,
+        order_id: paymentOrder.razorpayOrderId,
+        prefill: {
+          name: bank.bankName,
+          email: bank.email,
+          contact: bank.mobile,
+        },
+        // Preselect the payment method / bank the user picked, while letting
+        // Razorpay's own Checkout UI handle the actual redirect + login.
+        method: paymentMethod === 'upi' ? { upi: true } : { netbanking: true },
+        ...(paymentMethod === 'netbanking' && {
+          // NOTE: confirm these bank codes in your Razorpay Dashboard —
+          // Settings → Payment Methods → Netbanking, since exact codes
+          // can vary. SBIN = State Bank of India is standard; Bank of
+          // Baroda's code should be verified there before going live.
+          prefill: {
+            name: bank.bankName,
+            email: bank.email,
+            contact: bank.mobile,
+            bank: netbankingBank === 'SBI' ? 'SBIN' : 'BARB_R',
+          },
+        }),
+        handler: async (response: any) => {
+          try {
+            await payments.verifyPayment({
+              orderId: order.id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            toast({ title: 'Payment successful!', description: `Order #${order.id} is confirmed.` });
+            setLocation(`/orders/${order.id}?payment=success`);
+          } catch (e) {
+            toast({ title: 'Payment verification failed', description: 'Please contact support if the amount was deducted.', variant: 'destructive' });
+            setLocation(`/orders/${order.id}?payment=failed`);
+          } finally {
+            setProcessingPayment(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setProcessingPayment(false);
+            toast({ title: 'Payment cancelled', description: 'You can retry payment from your order page.', variant: 'destructive' });
+            setLocation(`/orders/${order.id}?payment=failed`);
+          },
+        },
+        theme: { color: '#f59e0b' },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', () => {
+        setProcessingPayment(false);
+        toast({ title: 'Payment failed', description: 'Please try again.', variant: 'destructive' });
+        setLocation(`/orders/${order.id}?payment=failed`);
+      });
+      rzp.open();
+    } catch (e) {
+      setProcessingPayment(false);
+      // createMutation's onError already toasts for order-creation failures.
+    }
+  };
+
+  const submitOrder = () => {
+    if (paymentMethod === 'cod') {
+      submitCodOrder();
+    } else {
+      submitGatewayOrder();
+    }
+  };
+
+  const isSubmitting = createMutation.isPending || processingPayment;
 
   return (
     <div className="flex-1 p-6 lg:p-10 max-w-5xl mx-auto w-full">
@@ -215,20 +351,61 @@ export default function PlaceOrder() {
           <div className="bg-card border border-border rounded-xl p-6">
             <h2 className="font-semibold text-lg mb-4">Payment Method</h2>
             <div className="space-y-3">
-              {(['upi', 'cheque'] as const).map((method) => (
-                <label key={method} className={`flex items-start gap-4 cursor-pointer rounded-xl border p-4 transition-all ${paymentMethod === method ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}>
-                  <input type="radio" name="payment" value={method} checked={paymentMethod === method} onChange={() => setPaymentMethod(method)} className="accent-primary mt-0.5" />
-                  <div>
-                    <p className="font-semibold capitalize">{method === 'upi' ? 'UPI Payment' : 'Cheque / DD'}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {method === 'upi' ? `Pay to ${appSettings?.upiId ?? '—'}` : 'Payment by cheque or demand draft'}
-                    </p>
-                    {method === 'upi' && paymentMethod === 'upi' && appSettings?.upiQrCode && (
-                      <img src={appSettings.upiQrCode} alt="UPI QR Code" className="mt-3 rounded-lg border border-border h-40 w-40 object-contain bg-white p-2" />
-                    )}
+
+              {/* UPI */}
+              <label className={`flex items-start gap-4 cursor-pointer rounded-xl border p-4 transition-all ${paymentMethod === 'upi' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}>
+                <input type="radio" name="payment" value="upi" checked={paymentMethod === 'upi'} onChange={() => setPaymentMethod('upi')} className="accent-primary mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold">UPI Payment</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">GPay, PhonePe, Paytm, BHIM &mdash; pay to {appSettings?.upiId ?? '—'}</p>
+                  {paymentMethod === 'upi' && appSettings?.upiQrCode && (
+                    <div className="mt-3">
+                      <img src={appSettings.upiQrCode} alt="UPI QR Code" className="rounded-lg border border-border h-40 w-40 object-contain bg-white p-2" />
+                      <p className="text-[11px] text-muted-foreground mt-1">Or scan this QR code &mdash; you'll also get an app picker at checkout.</p>
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              {/* Netbanking */}
+              <label className={`flex items-start gap-4 cursor-pointer rounded-xl border p-4 transition-all ${paymentMethod === 'netbanking' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}>
+                <input type="radio" name="payment" value="netbanking" checked={paymentMethod === 'netbanking'} onChange={() => setPaymentMethod('netbanking')} className="accent-primary mt-0.5" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Landmark className="h-4 w-4 text-muted-foreground" />
+                    <p className="font-semibold">Netbanking</p>
                   </div>
-                </label>
-              ))}
+                  <p className="text-xs text-muted-foreground mt-0.5">Pay directly via your bank's netbanking login</p>
+                  {paymentMethod === 'netbanking' && (
+                    <div className="flex gap-2 mt-3">
+                      {(['SBI', 'BOB'] as const).map((b) => (
+                        <button
+                          type="button"
+                          key={b}
+                          onClick={() => setNetbankingBank(b)}
+                          className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                            netbankingBank === b ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:border-primary/40'
+                          }`}
+                        >
+                          {b === 'SBI' ? 'State Bank of India' : 'Bank of Baroda'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              {/* Pay after Delivery */}
+              <label className={`flex items-start gap-4 cursor-pointer rounded-xl border p-4 transition-all ${paymentMethod === 'cod' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'}`}>
+                <input type="radio" name="payment" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} className="accent-primary mt-0.5" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-muted-foreground" />
+                    <p className="font-semibold">Pay after Delivery</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Settle payment once your order arrives</p>
+                </div>
+              </label>
             </div>
           </div>
 
@@ -238,10 +415,10 @@ export default function PlaceOrder() {
           </div>
 
           <div className="flex gap-3 justify-between">
-            <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-            <Button onClick={submitOrder} disabled={createMutation.isPending} size="lg">
-              {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Confirm &amp; Place Order
+            <Button variant="outline" onClick={() => setStep(1)} disabled={isSubmitting}>Back</Button>
+            <Button onClick={submitOrder} disabled={isSubmitting} size="lg">
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {paymentMethod === 'cod' ? 'Confirm & Place Order' : 'Proceed to Pay'}
             </Button>
           </div>
         </div>

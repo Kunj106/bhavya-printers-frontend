@@ -43,8 +43,6 @@ const del  = <T>(path: string)              => req<T>('DELETE', path);
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export const auth = {
-  // Check whether an admin account has already been registered.
-  // Used by the register page to block access once an admin exists.
   adminExists:           () =>
     get<{ exists: boolean }>('/auth/admin/exists'),
 
@@ -57,7 +55,6 @@ export const auth = {
   adminRegister:         (username: string, password: string, email: string) =>
     post<{ token: string; role: string }>('/auth/admin/register', { username, password, email, confirmPassword: password }),
 
-  // Admin forgot-password (OTP via email)
   adminForgotSendOtp:    (email: string) =>
     post<{ message: string }>('/auth/admin/forgot-password/send-otp', { email }),
 
@@ -73,14 +70,12 @@ export const auth = {
   bankRegister:          (data: BankRegisterInput) =>
     post<{ token: string; role: string; bank: Bank }>('/auth/bank/register', data),
 
-  // Email OTP for bank login
   sendLoginOtp:          (email: string) =>
     post<{ message: string }>('/auth/bank/send-otp', { email }),
 
   verifyLoginOtp:        (email: string, otp: string) =>
     post<{ token: string; role: string; bank: Bank }>('/auth/bank/verify-otp', { email, otp }),
 
-  // Forgot password flow
   forgotSendOtp:         (email: string) =>
     post<{ message: string }>('/auth/bank/forgot-password/send-otp', { email }),
 
@@ -118,6 +113,36 @@ export const orders = {
   updateStatus:  (id: number, status: string)   => put<Order>(`/orders/${id}/status`, { status }),
   byBank:        (bankId: number)               => get<Order[]>(`/orders/bank/${bankId}`),
 };
+
+// ─── Payments (Razorpay) ─────────────────────────────────────────────────────
+
+export const payments = {
+  // Step 1: ask backend to create a Razorpay order tied to our internal order.
+  createPaymentOrder: (orderId: number) =>
+    post<CreatePaymentOrderResponse>(`/payments/create/${orderId}`, {}),
+
+  // Step 2: after Razorpay Checkout succeeds client-side, verify server-side.
+  verifyPayment: (data: VerifyPaymentInput) =>
+    post<{ message: string }>('/payments/verify', data),
+
+  // Admin-only: manually mark a Pay-after-Delivery (COD) order as paid.
+  markPaidManually: (orderId: number) =>
+    put<{ message: string }>(`/payments/${orderId}/mark-paid`, {}),
+};
+
+export interface CreatePaymentOrderResponse {
+  razorpayOrderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+}
+
+export interface VerifyPaymentInput {
+  orderId: number;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}
 
 // ─── Analytics ───────────────────────────────────────────────────────────────
 
@@ -210,9 +235,11 @@ export interface Order {
   gstRate: number;
   gstAmount: number;
   total: number;
-  paymentMethod: string;
+  paymentMethod: string; // 'UPI' | 'NETBANKING' | 'COD'
   upiId?: string;
   status: string;
+  paymentStatus: string; // 'Pending' | 'Paid' | 'Failed'
+  bankCode?: string;
   createdAt: string;
 }
 

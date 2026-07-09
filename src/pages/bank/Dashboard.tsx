@@ -95,7 +95,6 @@ export default function Dashboard() {
                   <th className="px-6 py-4 font-medium">Date</th>
                   <th className="px-6 py-4 font-medium">Items</th>
                   <th className="px-6 py-4 font-medium">Total Amount</th>
-                  <th className="px-6 py-4 font-medium">Status</th>
                   <th className="px-6 py-4 font-medium text-right">Action</th>
                 </tr>
               </thead>
