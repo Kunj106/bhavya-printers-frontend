@@ -1,22 +1,61 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { orders } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { formatRupee } from '@/lib/utils';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
-import { Package, FileText, ChevronRight, Plus, Loader2 } from 'lucide-react';
+import { Package, FileText, ChevronRight, Plus, Loader2, CreditCard } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { payForExistingOrder } from '@/lib/razorpay';
+
+function PaymentStatusPill({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    Paid: 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20',
+    Failed: 'bg-red-500/10 text-red-500 ring-red-500/20',
+    Pending: 'bg-amber-500/10 text-amber-500 ring-amber-500/20',
+  };
+  return (
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${map[status] ?? map.Pending}`}>
+      {status === 'Paid' ? 'Paid' : status === 'Failed' ? 'Payment Failed' : 'Payment Pending'}
+    </span>
+  );
+}
 
 export default function Dashboard() {
   const { bank } = useAuth();
-  
+  const qc = useQueryClient();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [payingId, setPayingId] = useState<number | null>(null);
+
   const { data: bankOrders, isLoading } = useQuery({
     queryKey: ['orders', 'bank', bank?.id],
     queryFn: () => orders.byBank(bank!.id),
     enabled: !!bank?.id,
   });
+
+  const handlePayNow = async (orderId: number) => {
+    if (!bank) return;
+    setPayingId(orderId);
+    try {
+      const result = await payForExistingOrder(orderId, bank);
+      qc.invalidateQueries({ queryKey: ['orders', 'bank', bank.id] });
+      if (result === 'success') {
+        toast({ title: 'Payment successful!', description: `Order #${orderId} is confirmed.` });
+        setLocation(`/orders/${orderId}?payment=success`);
+      } else {
+        toast({ title: 'Payment failed or cancelled', variant: 'destructive' });
+        setLocation(`/orders/${orderId}?payment=failed`);
+      }
+    } catch (e) {
+      toast({ title: 'Payment error', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setPayingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -95,34 +134,56 @@ export default function Dashboard() {
                   <th className="px-6 py-4 font-medium">Date</th>
                   <th className="px-6 py-4 font-medium">Items</th>
                   <th className="px-6 py-4 font-medium">Total Amount</th>
+                  <th className="px-6 py-4 font-medium">Payment</th>
                   <th className="px-6 py-4 font-medium text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {recentOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-muted/30 transition-colors group">
-                    <td className="px-6 py-4 font-medium">#ORD-{order.id.toString().padStart(4, '0')}</td>
-                    <td className="px-6 py-4 text-muted-foreground">
-                      {format(new Date(order.createdAt), 'dd MMM yyyy')}
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground">
-                      {order.items.length} product{order.items.length !== 1 && 's'}
-                    </td>
-                    <td className="px-6 py-4 font-medium">
-                      {formatRupee(order.total)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={order.status} />
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Link href={`/orders/${order.id}`}>
-                        <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                          View Details <ChevronRight className="ml-1 h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {recentOrders.map((order) => {
+                  // "Pay Now" only makes sense for gateway methods (UPI/Netbanking)
+                  // that haven't succeeded yet. COD is settled after delivery,
+                  // and already-Paid orders don't need a payment action.
+                  const canPayNow = order.paymentStatus !== 'Paid' && order.paymentMethod !== 'COD';
+                  const isPaying = payingId === order.id;
+
+                  return (
+                    <tr key={order.id} className="hover:bg-muted/30 transition-colors group">
+                      <td className="px-6 py-4 font-medium">#ORD-{order.id.toString().padStart(4, '0')}</td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {format(new Date(order.createdAt), 'dd MMM yyyy')}
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {order.items.length} product{order.items.length !== 1 && 's'}
+                      </td>
+                      <td className="px-6 py-4 font-medium">
+                        {formatRupee(order.total)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <PaymentStatusPill status={order.paymentStatus} />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          {canPayNow && (
+                            <Button
+                              size="sm"
+                              className="gap-1.5"
+                              disabled={isPaying}
+                              onClick={() => handlePayNow(order.id)}
+                            >
+                              {isPaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />}
+                              Pay Now
+                            </Button>
+                          )}
+                          <Link href={`/orders/${order.id}`}>
+                            <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              View Details <ChevronRight className="ml-1 h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
