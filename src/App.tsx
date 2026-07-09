@@ -8,7 +8,8 @@ import { AuthProvider } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
-import AdminReports from '@/pages/admin/AdminReports';
+import AdminLogin from '@/pages/admin/AdminLogin';
+import AdminRegister from '@/pages/admin/AdminRegister';
 
 // Public pages
 import Landing from '@/pages/Landing';
