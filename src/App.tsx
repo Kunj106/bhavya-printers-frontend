@@ -21,6 +21,7 @@ import Register from '@/pages/Register';
 import Dashboard from '@/pages/bank/Dashboard';
 import PlaceOrder from '@/pages/bank/PlaceOrder';
 import OrderDetail from '@/pages/bank/OrderDetail';
+import BankProfile from '@/pages/bank/BankProfile';
 
 // Admin pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -63,6 +64,9 @@ function Router() {
           </Route>
           <Route path="/orders/:id">
             <ProtectedRoute role="bank" component={OrderDetail} />
+          </Route>
+          <Route path="/profile">
+            <ProtectedRoute role="bank" component={BankProfile} />
           </Route>
 
           {/* Admin protected */}
