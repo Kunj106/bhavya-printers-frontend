@@ -20,6 +20,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +105,20 @@ export default function AdminLogin() {
     },
     onError: (err: Error) =>
       toast({ title: 'Login failed', description: err.message, variant: 'destructive' }),
+  });
+
+  // ── Google login ──────────────────────────────────────────────────────
+  // Admin is a single whitelisted account (checked server-side against
+  // google.admin.email) — there's no "register via Google" path for admin.
+  const googleLoginMutation = useMutation({
+    mutationFn: (idToken: string) => auth.adminGoogleLogin(idToken),
+    onSuccess: (data) => {
+      login(data.token, 'admin', { adminUsername: data.role });
+      toast({ title: 'Welcome, Admin', description: 'You are now logged in.' });
+      setLocation('/admin/dashboard');
+    },
+    onError: (err: Error) =>
+      toast({ title: 'Google sign-in failed', description: err.message, variant: 'destructive' }),
   });
 
   // ── Forgot password — step 1: send OTP ───────────────────────────────────
@@ -359,8 +374,26 @@ export default function AdminLogin() {
           <p className="text-muted-foreground mt-1 text-sm">Bhavya Printers Administration</p>
         </div>
 
-        {/* Tabs: Username / Email */}
         <div className="bg-card border border-border rounded-2xl shadow-lg p-8">
+          <div className="flex justify-center mb-6">
+            <GoogleSignInButton
+              text="signin_with"
+              disabled={googleLoginMutation.isPending}
+              onIdToken={(idToken) => googleLoginMutation.mutate(idToken)}
+              onError={(message) => toast({ title: 'Google Sign-In error', description: message, variant: 'destructive' })}
+            />
+          </div>
+
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+            </div>
+          </div>
+
+          {/* Tabs: Username / Email */}
           <Tabs defaultValue="username" className="w-full">
             <TabsList className="grid grid-cols-2 w-full mb-6">
               <TabsTrigger value="username">Username</TabsTrigger>

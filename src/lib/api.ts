@@ -35,6 +35,35 @@ async function req<T>(
   return json as T;
 }
 
+/**
+ * Like req(), but never throws on a non-ok response — instead returns the
+ * status and parsed body so the caller can inspect them. Needed for
+ * endpoints like /auth/bank/google, which return a 404 carrying useful
+ * data (email, name) that a normal thrown Error would discard.
+ */
+async function reqCapture<T = Record<string, unknown>>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<{ ok: boolean; status: number; data: T }> {
+  const res = await fetch(`${BASE}/api${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let json: Record<string, unknown> = {};
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    // leave json as {} — caller falls back to a generic message
+  }
+  return { ok: res.ok, status: res.status, data: json as T };
+}
+
 const get  = <T>(path: string)              => req<T>('GET',    path);
 async function upload<T>(
   method: string,
@@ -98,11 +127,58 @@ export const auth = {
   adminForgotReset:      (email: string, newPassword: string) =>
     post<{ message: string }>('/auth/admin/forgot-password/reset-password', { email, password: newPassword }),
 
+  /** Admin is a single whitelisted Google account (google.admin.email on the backend). */
+  adminGoogleLogin:      (idToken: string) =>
+    post<{ token: string; role: string }>('/auth/admin/google', { idToken }),
+
   bankLogin:             (email: string, password: string) =>
     post<{ token: string; role: string; bank: Bank }>('/auth/bank/login', { email, password }),
 
   bankRegister:          (data: BankRegisterInput) =>
     post<{ token: string; role: string; bank: Bank }>('/auth/bank/register', data),
+
+  /**
+   * Signs in an existing bank via Google. On success, returns the same
+   * shape as bankLogin. If the Google account isn't linked to a bank yet,
+   * throws an Error with `.status === 404` and `.data` containing
+   * { error, email, name } from the backend — use these to route the user
+   * into bankGoogleRegister.
+   */
+  bankGoogleLogin:       async (idToken: string) => {
+    const { ok, status, data } = await reqCapture<{
+      token?: string; role?: string; bank?: Bank;
+      error?: string; email?: string; name?: string;
+    }>('POST', '/auth/bank/google', { idToken });
+
+    if (!ok) {
+      const err: any = new Error(data?.error ?? `HTTP ${status}`);
+      err.status = status;
+      err.data = data;
+      throw err;
+    }
+    return data as { token: string; role: string; bank: Bank };
+  },
+
+  /**
+   * Completes registration for a bank whose Google account returned 404
+   * from bankGoogleLogin. The email itself isn't sent — the backend
+   * re-derives it from the same idToken so it can't be spoofed.
+   */
+  bankGoogleRegister:    (
+    idToken: string,
+    fields: {
+      bankName: string;
+      branchName: string;
+      gstNo: string;
+      panNo: string;
+      address: string;
+      mobile: string;
+    }
+  ) =>
+    post<{ token: string; role: string; bank: Bank }>('/auth/bank/google-register', {
+      idToken,
+      ...fields,
+    }),
 
   sendLoginOtp:          (email: string) =>
     post<{ message: string }>('/auth/bank/send-otp', { email }),

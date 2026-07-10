@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 
 const passwordSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -27,10 +28,16 @@ const otpVerifySchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits'),
 });
 
-const forgotPasswordSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  otp: z.string().optional(),
-  newPassword: z.string().optional(),
+// Fields still needed to complete registration after Google verifies the
+// email — everything except email/password, since Google already proved
+// ownership of the email and this account won't use password login.
+const googleRegisterSchema = z.object({
+  bankName: z.string().min(1, 'Bank name is required'),
+  branchName: z.string().min(1, 'Branch name is required'),
+  gstNo: z.string().min(1, 'GST number is required'),
+  panNo: z.string().min(1, 'PAN number is required'),
+  address: z.string().min(1, 'Address is required'),
+  mobile: z.string().min(10, 'Enter a valid mobile number'),
 });
 
 export default function Login() {
@@ -44,6 +51,15 @@ export default function Login() {
 
   const [otpEmail, setOtpEmail] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
+
+  // ── Google Sign-In state ──────────────────────────────────────────────
+  // Set once Google returns "not registered" for this email, so we can
+  // show the completion form and finish registration with the same idToken.
+  const [googlePendingRegistration, setGooglePendingRegistration] = useState<{
+    idToken: string;
+    email: string;
+    name: string;
+  } | null>(null);
 
   // Password Login
   const passwordForm = useForm({
@@ -95,6 +111,50 @@ export default function Login() {
     },
     onError: (err: Error) => {
       toast({ title: 'Verification failed', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // ── Google login ──────────────────────────────────────────────────────
+  const googleLoginMutation = useMutation({
+    mutationFn: (idToken: string) => auth.bankGoogleLogin(idToken),
+    onSuccess: (data) => {
+      login(data.token, data.role as any, { bank: data.bank });
+      toast({ title: 'Welcome back', description: 'Successfully logged in with Google.' });
+      setLocation('/dashboard');
+    },
+    onError: (err: any, idToken) => {
+      // Backend returns 404 + { email, name } when this Google account
+      // isn't linked to a bank yet — offer to complete registration.
+      if (err?.status === 404 && err?.data?.email) {
+        setGooglePendingRegistration({
+          idToken,
+          email: err.data.email,
+          name: err.data.name || err.data.email,
+        });
+        return;
+      }
+      toast({ title: 'Google sign-in failed', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // ── Google registration completion ───────────────────────────────────
+  const googleRegisterForm = useForm<z.infer<typeof googleRegisterSchema>>({
+    resolver: zodResolver(googleRegisterSchema),
+    defaultValues: { bankName: '', branchName: '', gstNo: '', panNo: '', address: '', mobile: '' },
+  });
+
+  const googleRegisterMutation = useMutation({
+    mutationFn: (data: z.infer<typeof googleRegisterSchema>) => {
+      if (!googlePendingRegistration) throw new Error('Missing Google sign-in data');
+      return auth.bankGoogleRegister(googlePendingRegistration.idToken, data);
+    },
+    onSuccess: (data) => {
+      login(data.token, data.role as any, { bank: data.bank });
+      toast({ title: 'Account created', description: 'Welcome to Bhavya Printers.' });
+      setLocation('/dashboard');
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Registration failed', description: err.message, variant: 'destructive' });
     },
   });
 
@@ -210,6 +270,87 @@ export default function Login() {
     );
   }
 
+  // ── Complete registration after Google Sign-In found no existing bank ──
+  if (googlePendingRegistration) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4 py-12">
+        <div className="w-full max-w-md bg-card border rounded-2xl p-6 md:p-8 shadow-sm">
+          <div className="flex flex-col items-center text-center mb-8">
+            <div className="h-12 w-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-4">
+              <Building2 className="h-6 w-6" />
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight">Complete Registration</h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              No account found for <span className="font-medium text-foreground">{googlePendingRegistration.email}</span>.
+              Fill in your branch details to finish setting up your account.
+            </p>
+          </div>
+
+          <Form {...googleRegisterForm}>
+            <form onSubmit={googleRegisterForm.handleSubmit((d) => googleRegisterMutation.mutate(d))} className="space-y-4">
+              <FormField control={googleRegisterForm.control} name="bankName" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bank Name</FormLabel>
+                  <FormControl><Input placeholder="State Bank of India" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={googleRegisterForm.control} name="branchName" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Branch Name</FormLabel>
+                  <FormControl><Input placeholder="Bharuch" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={googleRegisterForm.control} name="gstNo" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>GST No.</FormLabel>
+                    <FormControl><Input placeholder="22AAAAA0000A1Z5" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={googleRegisterForm.control} name="panNo" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PAN No.</FormLabel>
+                    <FormControl><Input placeholder="AAAAA0000A" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <FormField control={googleRegisterForm.control} name="address" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl><Input placeholder="Branch address" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={googleRegisterForm.control} name="mobile" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mobile Number</FormLabel>
+                  <FormControl><Input placeholder="9876543210" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <Button type="submit" className="w-full" disabled={googleRegisterMutation.isPending}>
+                {googleRegisterMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Finish Registration
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setGooglePendingRegistration(null)}
+              >
+                Cancel
+              </Button>
+            </form>
+          </Form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex items-center justify-center p-4 py-12">
       <div className="w-full max-w-md bg-card border rounded-2xl p-6 md:p-8 shadow-sm">
@@ -221,6 +362,24 @@ export default function Login() {
           <p className="text-sm text-muted-foreground mt-2">
             Access your branch's ordering dashboard
           </p>
+        </div>
+
+        <div className="flex justify-center mb-6">
+          <GoogleSignInButton
+            text="signin_with"
+            disabled={googleLoginMutation.isPending}
+            onIdToken={(idToken) => googleLoginMutation.mutate(idToken)}
+            onError={(message) => toast({ title: 'Google Sign-In error', description: message, variant: 'destructive' })}
+          />
+        </div>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
