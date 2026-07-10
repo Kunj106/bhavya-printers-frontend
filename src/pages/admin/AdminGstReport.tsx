@@ -16,19 +16,19 @@ export default function AdminGstReport() {
 
   console.log(gstOrders);
 
- useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
 
-  if (
-    params.get("print") === "true" &&
-    !isLoading &&
-    (gstOrders?.length ?? 0) > 0
-  ) {
-    setTimeout(() => {
-      window.print();
-    }, 300);
-  }
-}, [isLoading, gstOrders]);
+    if (
+      params.get("print") === "true" &&
+      !isLoading &&
+      (gstOrders?.length ?? 0) > 0
+    ) {
+      setTimeout(() => {
+        window.print();
+      }, 300);
+    }
+  }, [isLoading, gstOrders]);
 
   if (isLoading) {
     return (
@@ -137,7 +137,17 @@ export default function AdminGstReport() {
 
       <div className="overflow-x-auto">
 
-<table className="min-w-[900px] w-full text-sm">
+        <table className="min-w-[900px] w-full text-sm table-fixed border-collapse">
+
+          <colgroup>
+            <col className="w-[14%]" />
+            <col className="w-[12%]" />
+            <col className="w-[14%]" />
+            <col className="w-[14%]" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+            <col className="w-[16%]" />
+          </colgroup>
 
           <thead className="bg-muted">
 
@@ -179,57 +189,57 @@ export default function AdminGstReport() {
 
             {(gstOrders ?? []).map((order) => (
 
-             <tr key={order.orderId} className="border-t">
+              <tr key={order.orderId} className="border-t">
 
-  <td className="px-4 py-3">
-    ORD-{String(order.orderId).padStart(4, "0")}
-  </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  ORD-{String(order.orderId).padStart(4, "0")}
+                </td>
 
-  <td className="px-4 py-3">
-    {new Date(order.orderDate).toLocaleDateString("en-IN")}
-  </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {new Date(order.orderDate).toLocaleDateString("en-IN")}
+                </td>
 
-  <td className="px-4 py-3">
-    {order.bankName}
-  </td>
+                <td className="px-4 py-3">
+                  {order.bankName}
+                </td>
 
-  <td className="px-4 py-3">
-    {order.branchName}
-  </td>
+                <td className="px-4 py-3">
+                  {order.branchName}
+                </td>
 
-  <td className="px-4 py-3 text-right">
-    {formatRupee(order.taxableAmount)}
-  </td>
+                <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                  {formatRupee(order.taxableAmount)}
+                </td>
 
-  <td className="px-4 py-3 text-right">
-    {formatRupee(order.gstAmount)}
-  </td>
+                <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                  {formatRupee(order.gstAmount)}
+                </td>
 
-  <td className="px-4 py-3 text-right font-semibold">
-    {formatRupee(order.totalAmount)}
-  </td>
+                <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap font-semibold">
+                  {formatRupee(order.totalAmount)}
+                </td>
 
-</tr>
+              </tr>
 
             ))}
 
             <tr className="border-t-2 bg-primary/5 font-bold">
 
-              <td colSpan={4}>
-TOTAL
-</td>
+              <td colSpan={4} className="px-4 py-3">
+                TOTAL
+              </td>
 
-<td className="text-right">
-{formatRupee(totalTaxable)}
-</td>
+              <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                {formatRupee(totalTaxable)}
+              </td>
 
-<td className="text-right">
-{formatRupee(totalGST)}
-</td>
+              <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                {formatRupee(totalGST)}
+              </td>
 
-<td className="text-right">
-{formatRupee(grandTotal)}
-</td>
+              <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                {formatRupee(grandTotal)}
+              </td>
 
             </tr>
 

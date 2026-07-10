@@ -44,9 +44,9 @@ export default function AdminDashboard() {
     queryKey: ['analytics', 'top-banks'],
     queryFn: analytics.topBanks,
   });
- const { data: monthlyGst, isLoading: gstLoading } = useQuery({
-  queryKey: ['analytics', 'monthly-gst'],
-  queryFn: analytics.monthlyGst,
+  const { data: monthlyGst, isLoading: gstLoading } = useQuery({
+    queryKey: ['analytics', 'monthly-gst'],
+    queryFn: analytics.monthlyGst,
   });
 
   const revenueChartData = (revenue ?? [])
@@ -58,31 +58,31 @@ export default function AdminDashboard() {
       Orders: r.orderCount,
     }));
 
- const topBanksData = (topBanks ?? []).map((b) => ({
-  name: `${b.bankName} - ${b.branchName}`,
-  Spend: b.totalSpend,
-  Orders: b.orderCount,
-}));
+  const topBanksData = (topBanks ?? []).map((b) => ({
+    name: `${b.bankName} - ${b.branchName}`,
+    Spend: b.totalSpend,
+    Orders: b.orderCount,
+  }));
 
-   const totalTaxable =
-  (monthlyGst ?? []).reduce(
-    (sum, order) => sum + order.taxableAmount,
-    0
-  );
+  const totalTaxable =
+    (monthlyGst ?? []).reduce(
+      (sum, order) => sum + order.taxableAmount,
+      0
+    );
 
   const totalGST =
-  (monthlyGst ?? []).reduce(
-    (sum, order) => sum + order.gstAmount,
-    0
-  );
+    (monthlyGst ?? []).reduce(
+      (sum, order) => sum + order.gstAmount,
+      0
+    );
 
   const grandTotal =
-  (monthlyGst ?? []).reduce(
-    (sum, order) => sum + order.totalAmount,
-    0
-   );
+    (monthlyGst ?? []).reduce(
+      (sum, order) => sum + order.totalAmount,
+      0
+    );
 
-   const downloadGSTReport = () => {
+  const downloadGSTReport = () => {
 
     const doc = new jsPDF();
 
@@ -96,17 +96,17 @@ export default function AdminDashboard() {
 
     autoTable(doc, {
 
-       head: [[
-      "Order ID",
-      "Date",
-      "Bank",
-      "Branch",
-      "Taxable",
-      "GST",
-      "Total"
-    ]],
+      head: [[
+        "Order ID",
+        "Date",
+        "Bank",
+        "Branch",
+        "Taxable",
+        "GST",
+        "Total"
+      ]],
 
-        body: (monthlyGst ?? []).map(order => [
+      body: (monthlyGst ?? []).map(order => [
         `ORD-${String(order.orderId).padStart(4, "0")}`,
         new Date(order.orderDate).toLocaleDateString("en-IN"),
         order.bankName,
@@ -114,32 +114,32 @@ export default function AdminDashboard() {
         formatRupee(order.taxableAmount),
         formatRupee(order.gstAmount),
         formatRupee(order.totalAmount),
-  ]),
+      ]),
 
-        foot: [[
-            "",
-            "TOTAL",
+      foot: [[
+        "",
+        "TOTAL",
 
-            formatRupee(totalTaxable),
+        formatRupee(totalTaxable),
 
-            formatRupee(totalGST),
+        formatRupee(totalGST),
 
-            formatRupee(grandTotal)
-        ]],
+        formatRupee(grandTotal)
+      ]],
 
-        startY: 32
+      startY: 32
 
     });
 
     doc.save("GST_Report.pdf");
 
-};
+  };
 
-const printGSTReport = () => {
+  const printGSTReport = () => {
 
     window.print();
 
-};
+  };
 
 
 
@@ -205,38 +205,38 @@ const printGSTReport = () => {
       </div>
 
       <div className="mt-4">
-    <table className="w-full text-sm">
-        <thead>
+        <table className="w-full text-sm">
+          <thead>
             <tr>
-                <th className="text-left">Bank</th>
-                <th className="text-right">Orders</th>
-                <th className="text-right">Spend</th>
+              <th className="text-left">Bank</th>
+              <th className="text-right">Orders</th>
+              <th className="text-right">Spend</th>
             </tr>
-        </thead>
+          </thead>
 
-        <tbody>
+          <tbody>
 
             {topBanksData.map((bank) => (
 
-                <tr key={bank.name}>
+              <tr key={bank.name}>
 
-                    <td>{bank.name}</td>
+                <td>{bank.name}</td>
 
-                    <td className="text-right">
-                        {bank.Orders}
-                    </td>
+                <td className="text-right">
+                  {bank.Orders}
+                </td>
 
-                    <td className="text-right font-semibold">
-                        {formatRupee(bank.Spend)}
-                    </td>
+                <td className="text-right font-semibold">
+                  {formatRupee(bank.Spend)}
+                </td>
 
-                </tr>
+              </tr>
 
             ))}
 
-        </tbody>
-    </table>
-</div>
+          </tbody>
+        </table>
+      </div>
 
       {/* Top Banks */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -261,59 +261,59 @@ const printGSTReport = () => {
           )}
         </div>
 
-        
+
 
         {/* Monthly GST Table */}
         <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
 
-    <div>
+            <div>
 
-        <h2 className="text-lg font-semibold">
-            Monthly GST Summary
-        </h2>
+              <h2 className="text-lg font-semibold">
+                Monthly GST Summary
+              </h2>
 
-        <p className="text-sm text-muted-foreground">
-            Collected GST breakdown
-        </p>
+              <p className="text-sm text-muted-foreground">
+                Collected GST breakdown
+              </p>
 
-    </div>
+            </div>
 
-    <div className="flex gap-2">
+            <div className="flex gap-2">
 
-        <Button
-            size="sm"
-            variant="outline"
-            onClick={downloadGSTReport}
-        >
-            <Download className="mr-2 h-4 w-4"/>
-            PDF
-        </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={downloadGSTReport}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                PDF
+              </Button>
 
-        <Button
-    size="sm"
-    variant="outline"
-    onClick={() => {
-        window.open("/admin/reports/gst?print=true", "_blank");
-    }}
->
-    <Printer className="mr-2 h-4 w-4" />
-    Print
-</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  window.open("/admin/reports/gst?print=true", "_blank");
+                }}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </Button>
 
-    </div>
+            </div>
 
-</div>
+          </div>
           {gstLoading ? (
             <div className="h-48 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
             <div className="overflow-auto max-h-[220px]">
-              <table className="w-full text-xs text-left">
+              <table className="w-full text-xs text-left border-collapse">
                 <thead className="sticky top-0 bg-muted/50 text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2 font-semibold">OrderId</th>
-                    <th className="px-3 py-2 font-semibold">Date</th>
-                    <th className="px-3 py-2 font-semibold text-right">Bank</th>
+                    <th className="px-3 py-2 font-semibold whitespace-nowrap">OrderId</th>
+                    <th className="px-3 py-2 font-semibold whitespace-nowrap">Date</th>
+                    <th className="px-3 py-2 font-semibold">Bank</th>
                     <th className="px-3 py-2 font-semibold">Branch</th>
                     <th className="px-3 py-2 font-semibold text-right">Taxable</th>
                     <th className="px-3 py-2 font-semibold text-right">GST</th>
@@ -322,37 +322,43 @@ const printGSTReport = () => {
                 </thead>
                 <tbody>
                   {(monthlyGst ?? []).map((order) => (
-                   <tr key={order.orderId}>
-                   <td>#ORD-{order.orderId}</td>
-                  <td>
-                  {new Date(order.orderDate).toLocaleDateString("en-IN")}
-                  </td>
-                  <td>{order.bankName}</td>
-                  <td>{order.branchName}</td>
-                  <td>{formatRupee(order.taxableAmount)}</td>
-                  <td>{formatRupee(order.gstAmount)}</td>
-                  <td>{formatRupee(order.totalAmount)}</td>
-                  </tr>
+                    <tr key={order.orderId} className="border-b border-border/50">
+                      <td className="px-3 py-2 whitespace-nowrap">#ORD-{order.orderId}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {new Date(order.orderDate).toLocaleDateString("en-IN")}
+                      </td>
+                      <td className="px-3 py-2">{order.bankName}</td>
+                      <td className="px-3 py-2">{order.branchName}</td>
+                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                        {formatRupee(order.taxableAmount)}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                        {formatRupee(order.gstAmount)}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                        {formatRupee(order.totalAmount)}
+                      </td>
+                    </tr>
                   ))}
-                <tr className="border-t-2 bg-primary/5 font-bold">
+                  <tr className="border-t-2 bg-primary/5 font-bold">
 
-  <td colSpan={4} className="px-4 py-4">
-    GRAND TOTAL
-  </td>
+                    <td colSpan={4} className="px-3 py-3">
+                      GRAND TOTAL
+                    </td>
 
-  <td className="px-4 py-4 text-right">
-    {formatRupee(totalTaxable)}
-  </td>
+                    <td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">
+                      {formatRupee(totalTaxable)}
+                    </td>
 
-  <td className="px-4 py-4 text-right text-primary">
-    {formatRupee(totalGST)}
-  </td>
+                    <td className="px-3 py-3 text-right tabular-nums whitespace-nowrap text-primary">
+                      {formatRupee(totalGST)}
+                    </td>
 
-  <td className="px-4 py-4 text-right">
-    {formatRupee(grandTotal)}
-  </td>
+                    <td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">
+                      {formatRupee(grandTotal)}
+                    </td>
 
-</tr>
+                  </tr>
                 </tbody>
               </table>
             </div>
