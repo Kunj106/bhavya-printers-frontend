@@ -10,10 +10,10 @@ import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from "react";
 
 const upiSchema = z.object({
-  upiId: z.string().min(1, 'UPI ID is required'),
-  upiQrCode: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  upiId: z.string().min(1, "UPI ID is required"),
 });
 
 const credSchema = z.object({
@@ -43,7 +43,9 @@ export default function AdminSettings() {
 
   const upiForm = useForm<z.infer<typeof upiSchema>>({
     resolver: zodResolver(upiSchema),
-    defaultValues: { upiId: '', upiQrCode: '' },
+    defaultValues: {
+    upiId: '',
+}
   });
 
   const credForm = useForm<z.infer<typeof credSchema>>({
@@ -58,19 +60,55 @@ export default function AdminSettings() {
 
   const [gstRate, setGstRate] = React.useState<12 | 18>(18);
 
+  const [qrFile, setQrFile] = useState<File | null>(null);
+
+  const [previewUrl, setPreviewUrl] = useState("");
+
   useEffect(() => {
     if (cfg) {
-      upiForm.reset({ upiId: cfg.upiId ?? '', upiQrCode: cfg.upiQrCode ?? '' });
+      upiForm.reset({
+    upiId: cfg.upiId ?? "",
+});
       mobileForm.reset({ adminMobile: cfg.adminMobile ?? '' });
       setGstRate(cfg.gstRate === 12 ? 12 : 18);
     }
   }, [cfg]);
 
   const updateUpi = useMutation({
-    mutationFn: (d: z.infer<typeof upiSchema>) => settings.updateUpi(d.upiId, d.upiQrCode || undefined),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['settings'] }); toast({ title: 'UPI settings saved' }); },
-    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-  });
+  mutationFn: async (d: z.infer<typeof upiSchema>) => {
+
+    const formData = new FormData();
+
+    formData.append("upiId", d.upiId);
+
+    if (qrFile) {
+      formData.append("qrImage", qrFile);
+    }
+
+    return settings.updateUpi(formData);
+  },
+
+  onSuccess: () => {
+
+    qc.invalidateQueries({
+      queryKey: ["settings"],
+    });
+
+    toast({
+      title: "UPI settings saved",
+    });
+
+  },
+
+  onError: (e: Error) =>
+
+    toast({
+      title: "Error",
+      description: e.message,
+      variant: "destructive",
+    }),
+
+});
 
   const updateCred = useMutation({
     mutationFn: (d: z.infer<typeof credSchema>) =>
@@ -113,13 +151,47 @@ export default function AdminSettings() {
                 <FormMessage />
               </FormItem>
             )} />
-            <FormField control={upiForm.control} name="upiQrCode" render={({ field }) => (
-              <FormItem>
-                <FormLabel>QR Code Image URL (optional)</FormLabel>
-                <FormControl><Input placeholder="https://..." {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+          
+<div className="space-y-2">
+  <Label>Upload QR Code</Label>
+
+  <Input
+    type="file"
+    accept=".jpg,.jpeg,.png"
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+
+      if (!file) return;
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Maximum file size is 5 MB");
+        return;
+      }
+
+      setQrFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }}
+  />
+
+  <p className="text-xs text-muted-foreground">
+    Supported formats: JPG, JPEG, PNG (Maximum size: 5 MB)
+  </p>
+
+  {previewUrl && (
+    <div className="mt-4">
+      <Label className="mb-2 block">
+        QR Code Preview
+      </Label>
+
+      <img
+        src={previewUrl}
+        alt="QR Preview"
+        className="w-56 rounded-lg border shadow-sm"
+      />
+    </div>
+  )}
+</div>
+
             <Button type="submit" disabled={updateUpi.isPending}>
               {updateUpi.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save UPI Settings

@@ -6,12 +6,23 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
 import { Download, Printer } from "lucide-react";
+import { useEffect } from "react";
 
 export default function AdminGstReport() {
   const { data: gstOrders, isLoading } = useQuery({
     queryKey: ["analytics", "monthly-gst"],
     queryFn: analytics.monthlyGst,
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("print") === "true") {
+        setTimeout(() => {
+            window.print();
+        }, 500);
+     }
+  }, []);
 
   if (isLoading) {
     return (
@@ -131,7 +142,15 @@ export default function AdminGstReport() {
               </th>
 
               <th className="px-4 py-3 text-left">
+                Date
+              </th>
+
+              <th className="px-4 py-3 text-left">
                 Bank
+              </th>
+
+              <th className="px-4 py-3 text-left">
+                Branch
               </th>
 
               <th className="px-4 py-3 text-right">

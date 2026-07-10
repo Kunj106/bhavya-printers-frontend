@@ -11,6 +11,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, role: Role, data?: { bank?: Bank; adminUsername?: string }) => void;
   logout: () => void;
+  updateBank: (bank: Bank) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,8 +72,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('bp_admin');
   };
 
+  // Refreshes the stored bank object after a profile edit, without touching
+  // the token or forcing the bank to log in again.
+  const updateBank = (updated: Bank) => {
+    setBank(updated);
+    localStorage.setItem('bp_bank', JSON.stringify(updated));
+  };
+
   return (
-    <AuthContext.Provider value={{ token, role, bank, adminUsername, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ token, role, bank, adminUsername, isLoading, login, logout, updateBank }}>
       {children}
     </AuthContext.Provider>
   );

@@ -226,3 +226,18 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+@media print {
+
+  nav,
+  header,
+  footer,
+  button {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+}

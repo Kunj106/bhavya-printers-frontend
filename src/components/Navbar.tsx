@@ -41,6 +41,9 @@ export function Navbar() {
           <Link href="/orders/new" className={`text-sm font-medium transition-colors hover:text-primary ${location === '/orders/new' ? 'text-primary' : 'text-muted-foreground'}`}>
             Place Order
           </Link>
+          <Link href="/profile" className={`text-sm font-medium transition-colors hover:text-primary ${location === '/profile' ? 'text-primary' : 'text-muted-foreground'}`}>
+            My Profile
+          </Link>
         </>
       )}
 

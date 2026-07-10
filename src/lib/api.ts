@@ -36,6 +36,40 @@ async function req<T>(
 }
 
 const get  = <T>(path: string)              => req<T>('GET',    path);
+async function upload<T>(
+  method: string,
+  path: string,
+  formData: FormData,
+): Promise<T> {
+
+  const res = await fetch(`${BASE}/api${path}`, {
+    method,
+    headers: {
+      ...authHeaders(),
+    },
+    body: formData,
+  });
+
+  const text = await res.text();
+
+  let json: Record<string, unknown> = {};
+
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    if (!res.ok) {
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      String(json?.message ?? json?.error ?? `HTTP ${res.status}`)
+    );
+  }
+
+  return json as T;
+}
 const post = <T>(path: string, body: unknown) => req<T>('POST',   path, body);
 const put  = <T>(path: string, body: unknown) => req<T>('PUT',    path, body);
 const del  = <T>(path: string)              => req<T>('DELETE', path);
@@ -102,7 +136,21 @@ export const banks = {
   list:   ()           => get<Bank[]>('/banks'),
   get:    (id: number) => get<Bank>(`/banks/${id}`),
   delete: (id: number) => del<{ message: string }>(`/banks/${id}`),
+
+  updateProfile: (id: number, data: BankProfileUpdateInput) =>
+    put<Bank>(`/banks/${id}/profile`, data),
+
+  updatePassword: (id: number, data: { currentPassword: string; newPassword: string }) =>
+    put<{ message: string }>(`/banks/${id}/password`, data),
 };
+
+export interface BankProfileUpdateInput {
+  address?: string;
+  mobile?: string;
+  email?: string;
+  panNo?: string;
+  gstNo?: string;
+}
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 
@@ -159,11 +207,38 @@ export const analytics = {
 // ─── Settings ────────────────────────────────────────────────────────────────
 
 export const settings = {
-  get:                ()                          => get<AppSettings>('/settings'),
-  updateCredentials:  (data: UpdateCredentials)   => put<{ message: string; adminUsername: string }>('/settings/credentials', data),
-  updateUpi:          (upiId: string, upiQrCode?: string) => put<{ message: string }>('/settings/upi', { upiId, upiQrCode }),
-  updateAdminMobile:  (adminMobile: string)       => put<{ message: string }>('/settings/admin-mobile', { adminMobile }),
-  updateGstRate:      (gstRate: number)           => put<{ message: string; gstRate: number }>('/settings/gst-rate', { gstRate }),
+
+  get: () =>
+    get<AppSettings>("/settings"),
+
+  updateCredentials: (data: UpdateCredentials) =>
+    put<{ message: string; adminUsername: string }>(
+      "/settings/credentials",
+      data
+    ),
+
+  updateUpi: (formData: FormData) =>
+    upload<{ message: string }>(
+      "PUT",
+      "/settings/upi",
+      formData
+    ),
+
+  updateAdminMobile: (adminMobile: string) =>
+    put<{ message: string }>(
+      "/settings/admin-mobile",
+      {
+        adminMobile,
+      }
+    ),
+
+  updateGstRate: (gstRate: number) =>
+    put<{ message: string; gstRate: number }>(
+      "/settings/gst-rate",
+      {
+        gstRate,
+      }
+    ),
 };
 
 // ─── Health ──────────────────────────────────────────────────────────────────
@@ -282,7 +357,9 @@ export interface MonthlyRevenue {
 
 export interface OrderGst {
   orderId: number;
+  orderDate: string;
   bankName: string;
+  branchName: string;
   taxableAmount: number;
   gstAmount: number;
   totalAmount: number;

@@ -58,10 +58,10 @@ export default function AdminDashboard() {
       Orders: r.orderCount,
     }));
 
-  const topBanksData = (topBanks ?? []).map((b) => ({
-    name: b.bankName,
-    Spend: b.totalSpend,
-    Orders: b.orderCount,
+ const topBanksData = (topBanks ?? []).map((b) => ({
+  name: `${b.bankName} - ${b.branchName}`,
+  Spend: b.totalSpend,
+  Orders: b.orderCount,
 }));
 
    const totalTaxable =
@@ -96,27 +96,25 @@ export default function AdminDashboard() {
 
     autoTable(doc, {
 
-        head: [[
-            "Order ID",
-            "Bank",
-            "Taxable",
-            "GST",
-            "Total"
-        ]],
+       head: [[
+      "Order ID",
+      "Date",
+      "Bank",
+      "Branch",
+      "Taxable",
+      "GST",
+      "Total"
+    ]],
 
         body: (monthlyGst ?? []).map(order => [
-
-            order.orderId,
-
-            order.bankName,
-
-            formatRupee(order.taxableAmount),
-
-            formatRupee(order.gstAmount),
-
-            formatRupee(order.totalAmount)
-
-        ]),
+        `ORD-${String(order.orderId).padStart(4, "0")}`,
+        new Date(order.orderDate).toLocaleDateString("en-IN"),
+        order.bankName,
+        order.branchName,
+        formatRupee(order.taxableAmount),
+        formatRupee(order.gstAmount),
+        formatRupee(order.totalAmount),
+  ]),
 
         foot: [[
             "",
@@ -293,13 +291,15 @@ const printGSTReport = () => {
         </Button>
 
         <Button
-            size="sm"
-            variant="outline"
-            onClick={() => window.print()}
-        >
-            <Printer className="mr-2 h-4 w-4"/>
-            Print
-        </Button>
+    size="sm"
+    variant="outline"
+    onClick={() => {
+        window.open("/admin/reports/gst?print=true", "_blank");
+    }}
+>
+    <Printer className="mr-2 h-4 w-4" />
+    Print
+</Button>
 
     </div>
 
@@ -312,7 +312,9 @@ const printGSTReport = () => {
                 <thead className="sticky top-0 bg-muted/50 text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-semibold">OrderId</th>
+                    <th className="px-3 py-2 font-semibold">Date</th>
                     <th className="px-3 py-2 font-semibold text-right">Bank</th>
+                    <th className="px-3 py-2 font-semibold">Branch</th>
                     <th className="px-3 py-2 font-semibold text-right">Taxable</th>
                     <th className="px-3 py-2 font-semibold text-right">GST</th>
                     <th className="px-3 py-2 font-semibold text-right">Total</th>
@@ -322,16 +324,14 @@ const printGSTReport = () => {
                   {(monthlyGst ?? []).map((order) => (
                    <tr key={order.orderId}>
                    <td>#ORD-{order.orderId}</td>
+                  <td>
+                  {new Date(order.orderDate).toLocaleDateString("en-IN")}
+                  </td>
                   <td>{order.bankName}</td>
-                  <td className="text-right">
-                  {formatRupee(order.taxableAmount)}
-                  </td>
-                  <td className="text-right">
-                  {formatRupee(order.gstAmount)}
-                  </td>
-                  <td className="text-right font-semibold">
-                  {formatRupee(order.totalAmount)}
-                  </td>
+                  <td>{order.branchName}</td>
+                  <td>{formatRupee(order.taxableAmount)}</td>
+                  <td>{formatRupee(order.gstAmount)}</td>
+                  <td>{formatRupee(order.totalAmount)}</td>
                   </tr>
                   ))}
                  <tr className="border-t-2 font-bold bg-muted">
