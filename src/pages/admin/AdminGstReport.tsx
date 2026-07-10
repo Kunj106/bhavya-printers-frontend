@@ -14,15 +14,21 @@ export default function AdminGstReport() {
     queryFn: analytics.monthlyGst,
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+  console.log(gstOrders);
 
-    if (params.get("print") === "true") {
-        setTimeout(() => {
-            window.print();
-        }, 500);
-     }
-  }, []);
+ useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+
+  if (
+    params.get("print") === "true" &&
+    !isLoading &&
+    (gstOrders?.length ?? 0) > 0
+  ) {
+    setTimeout(() => {
+      window.print();
+    }, 300);
+  }
+}, [isLoading, gstOrders]);
 
   if (isLoading) {
     return (
@@ -129,9 +135,9 @@ export default function AdminGstReport() {
 
       </div>
 
-      <div className="overflow-x-auto border rounded-lg">
+      <div className="overflow-x-auto">
 
-        <table className="w-full text-sm">
+<table className="min-w-[900px] w-full text-sm">
 
           <thead className="bg-muted">
 
@@ -173,55 +179,57 @@ export default function AdminGstReport() {
 
             {(gstOrders ?? []).map((order) => (
 
-              <tr
-                key={order.orderId}
-                className="border-t"
-              >
+             <tr key={order.orderId} className="border-t">
 
-                <td className="px-4 py-3">
-                  ORD-{String(order.orderId).padStart(4, "0")}
-                </td>
+  <td className="px-4 py-3">
+    ORD-{String(order.orderId).padStart(4, "0")}
+  </td>
 
-                <td className="px-4 py-3">
-                  {order.bankName}
-                </td>
+  <td className="px-4 py-3">
+    {new Date(order.orderDate).toLocaleDateString("en-IN")}
+  </td>
 
-                <td className="px-4 py-3 text-right">
-                  {formatRupee(order.taxableAmount)}
-                </td>
+  <td className="px-4 py-3">
+    {order.bankName}
+  </td>
 
-                <td className="px-4 py-3 text-right">
-                  {formatRupee(order.gstAmount)}
-                </td>
+  <td className="px-4 py-3">
+    {order.branchName}
+  </td>
 
-                <td className="px-4 py-3 text-right font-semibold">
-                  {formatRupee(order.totalAmount)}
-                </td>
+  <td className="px-4 py-3 text-right">
+    {formatRupee(order.taxableAmount)}
+  </td>
 
-              </tr>
+  <td className="px-4 py-3 text-right">
+    {formatRupee(order.gstAmount)}
+  </td>
+
+  <td className="px-4 py-3 text-right font-semibold">
+    {formatRupee(order.totalAmount)}
+  </td>
+
+</tr>
 
             ))}
 
             <tr className="border-t-2 bg-primary/5 font-bold">
 
-              <td
-                colSpan={2}
-                className="px-4 py-4"
-              >
-                GRAND TOTAL
-              </td>
+              <td colSpan={4}>
+TOTAL
+</td>
 
-              <td className="px-4 py-4 text-right">
-                {formatRupee(totalTaxable)}
-              </td>
+<td className="text-right">
+{formatRupee(totalTaxable)}
+</td>
 
-              <td className="px-4 py-4 text-right text-primary">
-                {formatRupee(totalGST)}
-              </td>
+<td className="text-right">
+{formatRupee(totalGST)}
+</td>
 
-              <td className="px-4 py-4 text-right">
-                {formatRupee(grandTotal)}
-              </td>
+<td className="text-right">
+{formatRupee(grandTotal)}
+</td>
 
             </tr>
 

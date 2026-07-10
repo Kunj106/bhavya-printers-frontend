@@ -334,20 +334,25 @@ const printGSTReport = () => {
                   <td>{formatRupee(order.totalAmount)}</td>
                   </tr>
                   ))}
-                 <tr className="border-t-2 font-bold bg-muted">
-                 <td colSpan={2}>
-                 TOTAL
-                 </td>
-                <td className="text-right">
-                {formatRupee(totalTaxable)}
-                </td>
-                <td className="text-right">
-                {formatRupee(totalGST)}
-                </td>
-                <td className="text-right">
-                {formatRupee(grandTotal)}
-                </td>
-                </tr>
+                <tr className="border-t-2 bg-primary/5 font-bold">
+
+  <td colSpan={4} className="px-4 py-4">
+    GRAND TOTAL
+  </td>
+
+  <td className="px-4 py-4 text-right">
+    {formatRupee(totalTaxable)}
+  </td>
+
+  <td className="px-4 py-4 text-right text-primary">
+    {formatRupee(totalGST)}
+  </td>
+
+  <td className="px-4 py-4 text-right">
+    {formatRupee(grandTotal)}
+  </td>
+
+</tr>
                 </tbody>
               </table>
             </div>
