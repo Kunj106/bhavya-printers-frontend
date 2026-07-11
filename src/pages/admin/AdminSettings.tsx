@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Settings, CreditCard, ShieldCheck, Phone, Receipt } from 'lucide-react';
+import { Loader2, Settings, CreditCard, ShieldCheck, Phone, Receipt, FileSignature, FileImage } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { z } from 'zod';
@@ -24,6 +24,21 @@ const credSchema = z.object({
 
 const mobileSchema = z.object({ adminMobile: z.string() });
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+/** Converts a selected File into a base64 data URL (e.g.
+ *  "data:image/png;base64,...") so it can travel as plain JSON — no
+ *  multipart upload needed, and it drops straight into the DB and,
+ *  eventually, straight into the iText invoice generator. */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
     <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
@@ -32,6 +47,63 @@ function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: 
         <h2 className="text-lg font-semibold">{title}</h2>
       </div>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Reusable "upload an image, preview it, save it" block used for the UPI
+ * QR code, the invoice letterhead, and the digital signature. Takes the
+ * currently-saved image (if any) so it can show that as the initial
+ * preview instead of a blank box.
+ */
+function ImageUploadField({
+  label,
+  hint,
+  currentImage,
+  onFileSelected,
+}: {
+  label: string;
+  hint: string;
+  currentImage?: string;
+  onFileSelected: (file: File, previewUrl: string) => void;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+
+  const displayUrl = previewUrl || currentImage || '';
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input
+        type="file"
+        accept=".jpg,.jpeg,.png"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+
+          if (file.size > MAX_IMAGE_BYTES) {
+            alert('Maximum file size is 5 MB');
+            return;
+          }
+
+          const localUrl = URL.createObjectURL(file);
+          setPreviewUrl(localUrl);
+          onFileSelected(file, localUrl);
+        }}
+      />
+      <p className="text-xs text-muted-foreground">{hint}</p>
+
+      {displayUrl && (
+        <div className="mt-4">
+          <Label className="mb-2 block">Preview</Label>
+          <img
+            src={displayUrl}
+            alt={`${label} preview`}
+            className="w-56 rounded-lg border shadow-sm bg-white p-2"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -60,9 +132,10 @@ export default function AdminSettings() {
 
   const [gstRate, setGstRate] = React.useState<12 | 18>(18);
 
-  const [qrFile, setQrFile] = useState<File | null>(null);
-
-  const [previewUrl, setPreviewUrl] = useState("");
+  // Pending base64 image data, set once a file is chosen but not yet saved.
+  const [qrImageData, setQrImageData] = useState<string | null>(null);
+  const [letterheadImageData, setLetterheadImageData] = useState<string | null>(null);
+  const [signatureImageData, setSignatureImageData] = useState<string | null>(null);
 
   useEffect(() => {
     if (cfg) {
@@ -75,40 +148,18 @@ export default function AdminSettings() {
   }, [cfg]);
 
   const updateUpi = useMutation({
-  mutationFn: async (d: z.infer<typeof upiSchema>) => {
-
-    const formData = new FormData();
-
-    formData.append("upiId", d.upiId);
-
-    if (qrFile) {
-      formData.append("qrImage", qrFile);
-    }
-
-    return settings.updateUpi(formData);
-  },
-
-  onSuccess: () => {
-
-    qc.invalidateQueries({
-      queryKey: ["settings"],
-    });
-
-    toast({
-      title: "UPI settings saved",
-    });
-
-  },
-
-  onError: (e: Error) =>
-
-    toast({
-      title: "Error",
-      description: e.message,
-      variant: "destructive",
-    }),
-
-});
+    mutationFn: (d: z.infer<typeof upiSchema>) =>
+      settings.updateUpi({
+        upiId: d.upiId,
+        upiQrCode: qrImageData ?? undefined,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      toast({ title: "UPI settings saved" });
+    },
+    onError: (e: Error) =>
+      toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
 
   const updateCred = useMutation({
     mutationFn: (d: z.infer<typeof credSchema>) =>
@@ -126,6 +177,30 @@ export default function AdminSettings() {
   const updateGst = useMutation({
     mutationFn: (rate: number) => settings.updateGstRate(rate),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['settings'] }); toast({ title: 'GST rate updated' }); },
+    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
+
+  const updateLetterhead = useMutation({
+    mutationFn: () => {
+      if (!letterheadImageData) throw new Error('Choose a letterhead image first');
+      return settings.updateLetterhead(letterheadImageData);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings'] });
+      toast({ title: 'Letterhead saved', description: 'This will appear on every new invoice.' });
+    },
+    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
+
+  const updateSignature = useMutation({
+    mutationFn: () => {
+      if (!signatureImageData) throw new Error('Choose a signature image first');
+      return settings.updateSignature(signatureImageData);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings'] });
+      toast({ title: 'Signature saved', description: 'This will appear on every new invoice.' });
+    },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
@@ -151,46 +226,16 @@ export default function AdminSettings() {
                 <FormMessage />
               </FormItem>
             )} />
-          
-<div className="space-y-2">
-  <Label>Upload QR Code</Label>
 
-  <Input
-    type="file"
-    accept=".jpg,.jpeg,.png"
-    onChange={(e) => {
-      const file = e.target.files?.[0];
-
-      if (!file) return;
-
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Maximum file size is 5 MB");
-        return;
-      }
-
-      setQrFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }}
-  />
-
-  <p className="text-xs text-muted-foreground">
-    Supported formats: JPG, JPEG, PNG (Maximum size: 5 MB)
-  </p>
-
-  {previewUrl && (
-    <div className="mt-4">
-      <Label className="mb-2 block">
-        QR Code Preview
-      </Label>
-
-      <img
-        src={previewUrl}
-        alt="QR Preview"
-        className="w-56 rounded-lg border shadow-sm"
-      />
-    </div>
-  )}
-</div>
+            <ImageUploadField
+              label="Upload QR Code"
+              hint="Supported formats: JPG, JPEG, PNG (Maximum size: 5 MB)"
+              currentImage={cfg?.upiQrCode}
+              onFileSelected={async (file) => {
+                const base64 = await fileToBase64(file);
+                setQrImageData(base64);
+              }}
+            />
 
             <Button type="submit" disabled={updateUpi.isPending}>
               {updateUpi.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -198,6 +243,62 @@ export default function AdminSettings() {
             </Button>
           </form>
         </Form>
+      </SectionCard>
+
+      {/* Invoice Letterhead */}
+      <SectionCard icon={<FileImage className="h-5 w-5" />} title="Invoice Letterhead">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Upload your official Bhavya Printers letterhead. It will be stamped at the top of every
+            invoice generated when a bank places an order.
+          </p>
+
+          <ImageUploadField
+            label="Upload Letterhead"
+            hint="Supported formats: JPG, JPEG, PNG (Maximum size: 5 MB). Use a wide image for best results on an A4 invoice."
+            currentImage={cfg?.letterheadImage}
+            onFileSelected={async (file) => {
+              const base64 = await fileToBase64(file);
+              setLetterheadImageData(base64);
+            }}
+          />
+
+          <Button
+            onClick={() => updateLetterhead.mutate()}
+            disabled={updateLetterhead.isPending || !letterheadImageData}
+          >
+            {updateLetterhead.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Letterhead
+          </Button>
+        </div>
+      </SectionCard>
+
+      {/* Digital Signature */}
+      <SectionCard icon={<FileSignature className="h-5 w-5" />} title="Digital Signature">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Upload a scanned or digital signature. It will be placed at the bottom of every generated
+            invoice, alongside the letterhead.
+          </p>
+
+          <ImageUploadField
+            label="Upload Signature"
+            hint="Supported formats: JPG, JPEG, PNG (Maximum size: 5 MB). A transparent-background PNG looks best."
+            currentImage={cfg?.signatureImage}
+            onFileSelected={async (file) => {
+              const base64 = await fileToBase64(file);
+              setSignatureImageData(base64);
+            }}
+          />
+
+          <Button
+            onClick={() => updateSignature.mutate()}
+            disabled={updateSignature.isPending || !signatureImageData}
+          >
+            {updateSignature.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Signature
+          </Button>
+        </div>
       </SectionCard>
 
       {/* Admin Credentials */}

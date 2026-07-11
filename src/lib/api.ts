@@ -293,11 +293,15 @@ export const settings = {
       data
     ),
 
-  updateUpi: (formData: FormData) =>
-    upload<{ message: string }>(
-      "PUT",
+  /**
+   * upiQrCode is a base64 data URL string, sent as plain JSON (not
+   * multipart). Convert the selected File to base64 first — see
+   * fileToBase64() in AdminSettings.tsx.
+   */
+  updateUpi: (data: { upiId: string; upiQrCode?: string }) =>
+    put<{ upiId: string; upiQrCode: string; message: string }>(
       "/settings/upi",
-      formData
+      data
     ),
 
   updateAdminMobile: (adminMobile: string) =>
@@ -315,6 +319,14 @@ export const settings = {
         gstRate,
       }
     ),
+
+  /** image is a base64 data URL (e.g. "data:image/png;base64,..."). */
+  updateLetterhead: (image: string) =>
+    put<{ message: string }>("/settings/letterhead", { image }),
+
+  /** image is a base64 data URL (e.g. "data:image/png;base64,..."). */
+  updateSignature: (image: string) =>
+    put<{ message: string }>("/settings/signature", { image }),
 };
 
 // ─── Health ──────────────────────────────────────────────────────────────────
@@ -457,6 +469,8 @@ export interface AppSettings {
   otpEnabled: boolean;
   adminUsername: string;
   gstRate: number;
+  letterheadImage?: string;
+  signatureImage?: string;
 }
 
 export interface UpdateCredentials {
