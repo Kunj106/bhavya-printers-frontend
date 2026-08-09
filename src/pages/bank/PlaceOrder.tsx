@@ -7,6 +7,7 @@ import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { load } from '@cashfreepayments/cashfree-js';
 import { Loader2, Plus, Minus, ShoppingCart, CheckCircle, ChevronRight, Landmark, Truck } from 'lucide-react';
 
 type CartItem = { productId: number; name: string; price: number; quantity: number };

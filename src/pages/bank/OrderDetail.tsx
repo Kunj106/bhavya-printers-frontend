@@ -3,6 +3,7 @@ import { useRoute, Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { orders, payments } from '@/lib/api';
 import { formatRupee } from '@/lib/utils';
+import { load } from '@cashfreepayments/cashfree-js';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import {
@@ -107,79 +108,68 @@ export default function OrderDetail() {
   /**
    * Opens Cashfree Checkout.
    */
-  const handlePayment = async () => {
-    if (!order) return;
+  /**
+ * Opens Cashfree Checkout.
+ */
+const handlePayment = async () => {
+  if (!order) return;
 
-    try {
-      setIsPaying(true);
-      setPaymentError('');
+  try {
+    setIsPaying(true);
+    setPaymentError('');
 
-      /*
-       * Create Cashfree order on backend.
-       *
-       * Expected response:
-       * {
-       *   paymentSessionId: "...",
-       *   orderId: "ORDER_60001",
-       *   environment: "PRODUCTION"
-       * }
-       */
-      const paymentOrder = await payments.createPaymentOrder(order.id);
+    console.log('Starting Cashfree payment for order:', order.id);
 
-      if (!paymentOrder?.paymentSessionId) {
-        throw new Error(
-          'Cashfree did not return a payment session.'
-        );
-      }
+    // Create Cashfree payment session on backend
+    const paymentSession = await payments.createPaymentSession(order.id);
 
-      /*
-       * Remember which order is currently being paid.
-       *
-       * This helps PaymentSuccess.tsx know which order to check
-       * after Cashfree redirects back.
-       */
-      localStorage.setItem(
-        'cashfree_pending_order_id',
-        String(order.id)
+    console.log('Cashfree payment session:', paymentSession);
+
+    if (!paymentSession?.paymentSessionId) {
+      throw new Error(
+        'Cashfree did not return a payment session.'
       );
-
-      /*
-       * Load Cashfree SDK.
-       */
-      const cashfree = await load({
-        mode:
-          paymentOrder.environment === 'SANDBOX'
-            ? 'sandbox'
-            : 'production',
-      });
-
-      if (!cashfree) {
-        throw new Error(
-          'Unable to load Cashfree payment gateway.'
-        );
-      }
-
-      /*
-       * Open Cashfree Checkout.
-       *
-       * redirectTarget "_self" means Cashfree redirects the same
-       * browser tab to the return URL configured in the backend.
-       */
-      await cashfree.checkout({
-        paymentSessionId: paymentOrder.paymentSessionId,
-        redirectTarget: '_self',
-      });
-    } catch (error: any) {
-      console.error('Cashfree payment error:', error);
-
-      setPaymentError(
-        error?.message ||
-          'Unable to start payment. Please try again.'
-      );
-
-      setIsPaying(false);
     }
-  };
+
+    // Remember order being paid
+    localStorage.setItem(
+      'cashfree_pending_order_id',
+      String(order.id)
+    );
+
+    // Load Cashfree SDK
+    const cashfree = await load({
+      mode:
+        paymentSession.environment === 'PRODUCTION'
+          ? 'production'
+          : 'sandbox',
+    });
+
+    if (!cashfree) {
+      throw new Error(
+        'Unable to load Cashfree payment gateway.'
+      );
+    }
+
+    console.log('Opening Cashfree checkout...');
+
+    // Open Cashfree Checkout
+    await cashfree.checkout({
+      paymentSessionId: paymentSession.paymentSessionId,
+      redirectTarget: '_self',
+    });
+
+  } catch (error: any) {
+    console.error('Cashfree payment error:', error);
+
+    setPaymentError(
+      error?.message ||
+        'Unable to start payment. Please try again.'
+    );
+
+    setIsPaying(false);
+  }
+};
 
   if (isLoading) {
     return (
