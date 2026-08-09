@@ -240,33 +240,19 @@ export const orders = {
 
 // ─── Payments (Razorpay) ─────────────────────────────────────────────────────
 
+export interface CreatePaymentSessionResponse {
+  paymentSessionId: string;
+  orderId: string;
+  environment: string;
+}
+
 export const payments = {
-  // Step 1: ask backend to create a Razorpay order tied to our internal order.
-  createPaymentOrder: (orderId: number) =>
-    post<CreatePaymentOrderResponse>(`/payments/create/${orderId}`, {}),
-
-  // Step 2: after Razorpay Checkout succeeds client-side, verify server-side.
-  verifyPayment: (data: VerifyPaymentInput) =>
-    post<{ message: string }>('/payments/verify', data),
-
-  // Admin-only: manually mark a Pay-after-Delivery (COD) order as paid.
-  markPaidManually: (orderId: number) =>
-    put<{ message: string }>(`/payments/${orderId}/mark-paid`, {}),
+  createPaymentSession: (orderId: number) =>
+    post<CreatePaymentSessionResponse>(
+      `/payments/create/${orderId}`,
+      {}
+    ),
 };
-
-export interface CreatePaymentOrderResponse {
-  razorpayOrderId: string;
-  amount: number;
-  currency: string;
-  keyId: string;
-}
-
-export interface VerifyPaymentInput {
-  orderId: number;
-  razorpayOrderId: string;
-  razorpayPaymentId: string;
-  razorpaySignature: string;
-}
 
 // ─── Analytics ───────────────────────────────────────────────────────────────
 

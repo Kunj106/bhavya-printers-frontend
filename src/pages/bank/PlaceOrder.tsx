@@ -7,6 +7,7 @@ import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { load } from "@cashfreepayments/cashfree-js";
 import { Loader2, Plus, Minus, ShoppingCart, CheckCircle, ChevronRight, Landmark, Truck } from 'lucide-react';
 
 type CartItem = { productId: number; name: string; price: number; quantity: number };
@@ -15,20 +16,7 @@ type NetbankingBank = 'SBI' | 'BOB';
 
 const STEPS = ['Select Products', 'Review Details', 'Payment'];
 
-// Loads the Razorpay Checkout script once, on demand.
-function loadRazorpayScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
+
 
 export default function PlaceOrder() {
   const { bank } = useAuth();
@@ -95,116 +83,87 @@ export default function PlaceOrder() {
 
   // ── UPI / Netbanking: create order first, then open Razorpay Checkout. ──
   const submitGatewayOrder = async () => {
+
     if (!bank) return;
+
     setProcessingPayment(true);
 
     try {
-      const order = await new Promise<Awaited<ReturnType<typeof orders.create>>>((resolve, reject) => {
-        createMutation.mutate(
-          {
-            bankId: bank.id,
-            bankName: bank.bankName,
-            branchName: bank.branchName,
-            gstNo: bank.gstNo,
-            panNo: bank.panNo,
-            address: bank.address,
-            mobile: bank.mobile,
-            email: bank.email,
-            items: cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-            gstRate,
-            paymentMethod: paymentMethod === 'upi' ? 'UPI' : 'NETBANKING',
-            upiId: paymentMethod === 'upi' ? appSettings?.upiId : undefined,
-          },
-          { onSuccess: resolve, onError: reject }
+
+        const order = await new Promise<Awaited<ReturnType<typeof orders.create>>>(
+            (resolve, reject) => {
+
+                createMutation.mutate(
+                    {
+                        bankId: bank.id,
+                        bankName: bank.bankName,
+                        branchName: bank.branchName,
+                        gstNo: bank.gstNo,
+                        panNo: bank.panNo,
+                        address: bank.address,
+                        mobile: bank.mobile,
+                        email: bank.email,
+                        items: cart.map(i => ({
+                            productId: i.productId,
+                            quantity: i.quantity
+                        })),
+                        gstRate,
+                        paymentMethod:
+                            paymentMethod === "upi"
+                                ? "UPI"
+                                : "NETBANKING",
+                        upiId:
+                            paymentMethod === "upi"
+                                ? appSettings?.upiId
+                                : undefined,
+                    },
+                    {
+                        onSuccess: resolve,
+                        onError: reject,
+                    }
+                );
+
+            }
         );
-      });
 
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        toast({ title: 'Could not load payment gateway', description: 'Check your internet connection and try again.', variant: 'destructive' });
+        const session =
+            await payments.createPaymentSession(order.id);
+
+        const cashfree = await load({
+            mode:
+                session.environment === "PRODUCTION"
+                    ? "production"
+                    : "sandbox",
+        });
+
+               await cashfree?.checkout({
+               paymentSessionId: session.paymentSessionId,
+               redirectTarget: "_self",
+                });
+
+                setProcessingPayment(false);
+
+    } catch (e: any) {
+
         setProcessingPayment(false);
-        setLocation(`/orders/${order.id}?payment=failed`);
-        return;
-      }
 
-      const paymentOrder = await payments.createPaymentOrder(order.id);
+        toast({
+            title: "Payment Failed",
+            description:
+                e?.message ??
+                "Unable to start payment.",
+            variant: "destructive",
+        });
 
-      const options: any = {
-        key: paymentOrder.keyId,
-        amount: paymentOrder.amount,
-        currency: paymentOrder.currency,
-        name: 'Bhavya Printers',
-        description: `Order #${order.id}`,
-        order_id: paymentOrder.razorpayOrderId,
-        prefill: {
-          name: bank.bankName,
-          email: bank.email,
-          contact: bank.mobile,
-        },
-        // Preselect the payment method / bank the user picked, while letting
-        // Razorpay's own Checkout UI handle the actual redirect + login.
-        method: paymentMethod === 'upi' ? { upi: true } : { netbanking: true },
-        ...(paymentMethod === 'netbanking' && {
-          // NOTE: confirm these bank codes in your Razorpay Dashboard —
-          // Settings → Payment Methods → Netbanking, since exact codes
-          // can vary. SBIN = State Bank of India is standard; Bank of
-          // Baroda's code should be verified there before going live.
-          prefill: {
-            name: bank.bankName,
-            email: bank.email,
-            contact: bank.mobile,
-            bank: netbankingBank === 'SBI' ? 'SBIN' : 'BARB_R',
-          },
-        }),
-        handler: async (response: any) => {
-          try {
-            await payments.verifyPayment({
-              orderId: order.id,
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-            });
-            toast({ title: 'Payment successful!', description: `Order #${order.id} is confirmed.` });
-            setLocation(`/orders/${order.id}?payment=success`);
-          } catch (e) {
-            toast({ title: 'Payment verification failed', description: 'Please contact support if the amount was deducted.', variant: 'destructive' });
-            setLocation(`/orders/${order.id}?payment=failed`);
-          } finally {
-            setProcessingPayment(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setProcessingPayment(false);
-            toast({ title: 'Payment cancelled', description: 'You can retry payment from your order page.', variant: 'destructive' });
-            setLocation(`/orders/${order.id}?payment=failed`);
-          },
-        },
-        theme: { color: '#f59e0b' },
-      };
-
-      const rzp = new (window as any).Razorpay(options);
-      rzp.on('payment.failed', () => {
-        setProcessingPayment(false);
-        toast({ title: 'Payment failed', description: 'Please try again.', variant: 'destructive' });
-        setLocation(`/orders/${order.id}?payment=failed`);
-      });
-      rzp.open();
-    } catch (e) {
-      setProcessingPayment(false);
-      // createMutation's onError already toasts for order-creation failures.
     }
-  };
+    const submitOrder = () => {
+  if (paymentMethod === 'cod') {
+    submitCodOrder();
+  } else {
+    submitGatewayOrder();
+  }
+};
 
-  const submitOrder = () => {
-    if (paymentMethod === 'cod') {
-      submitCodOrder();
-    } else {
-      submitGatewayOrder();
-    }
-  };
-
-  const isSubmitting = createMutation.isPending || processingPayment;
 
   return (
     <div className="flex-1 p-6 lg:p-10 max-w-5xl mx-auto w-full">
@@ -415,9 +374,9 @@ export default function PlaceOrder() {
           </div>
 
           <div className="flex gap-3 justify-between">
-            <Button variant="outline" onClick={() => setStep(1)} disabled={isSubmitting}>Back</Button>
-            <Button onClick={submitOrder} disabled={isSubmitting} size="lg">
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button variant="outline" onClick={() => setStep(1)} disabled={processingPayment}>Back</Button>
+            <Button onClick={submitOrder} disabled={processingPayment} size="lg">
+              {processingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {paymentMethod === 'cod' ? 'Confirm & Place Order' : 'Proceed to Pay'}
             </Button>
           </div>
@@ -425,4 +384,5 @@ export default function PlaceOrder() {
       )}
     </div>
   );
+  }
 }
