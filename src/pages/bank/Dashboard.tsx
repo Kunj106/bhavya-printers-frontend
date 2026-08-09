@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { orders } from '@/lib/api';
+import { orders, payments } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { formatRupee } from '@/lib/utils';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -9,7 +9,7 @@ import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
 import { Package, FileText, ChevronRight, Plus, Loader2, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { payForExistingOrder } from '@/lib/razorpay';
+import { load } from '@cashfreepayments/cashfree-js';
 
 function PaymentStatusPill({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -37,22 +37,36 @@ export default function Dashboard() {
     enabled: !!bank?.id,
   });
 
+  // ── Pay Now: create a Cashfree payment session for an existing order, ──
+  // then open Cashfree Checkout. Same flow as OrderDetail.tsx's handlePayment.
   const handlePayNow = async (orderId: number) => {
     if (!bank) return;
     setPayingId(orderId);
+
     try {
-      const result = await payForExistingOrder(orderId, bank);
-      qc.invalidateQueries({ queryKey: ['orders', 'bank', bank.id] });
-      if (result === 'success') {
-        toast({ title: 'Payment successful!', description: `Order #${orderId} is confirmed.` });
-        setLocation(`/orders/${orderId}?payment=success`);
-      } else {
-        toast({ title: 'Payment failed or cancelled', variant: 'destructive' });
-        setLocation(`/orders/${orderId}?payment=failed`);
+      const session = await payments.createPaymentSession(orderId);
+
+      if (!session?.paymentSessionId) {
+        throw new Error('Cashfree did not return a payment session.');
       }
+
+      const cashfree = await load({
+        mode: session.environment === 'PRODUCTION' ? 'production' : 'sandbox',
+      });
+
+      if (!cashfree) {
+        throw new Error('Unable to load Cashfree payment gateway.');
+      }
+
+      // Cashfree redirects the browser to complete checkout, so control
+      // doesn't return here on success — OrderDetail.tsx picks up the
+      // ?payment=success/failed query param after the redirect back.
+      await cashfree.checkout({
+        paymentSessionId: session.paymentSessionId,
+        redirectTarget: '_self',
+      });
     } catch (e) {
       toast({ title: 'Payment error', description: (e as Error).message, variant: 'destructive' });
-    } finally {
       setPayingId(null);
     }
   };

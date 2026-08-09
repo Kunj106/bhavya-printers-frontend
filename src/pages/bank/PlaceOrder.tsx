@@ -16,8 +16,6 @@ type NetbankingBank = 'SBI' | 'BOB';
 
 const STEPS = ['Select Products', 'Review Details', 'Payment'];
 
-
-
 export default function PlaceOrder() {
   const { bank } = useAuth();
   const [, setLocation] = useLocation();
@@ -81,89 +79,79 @@ export default function PlaceOrder() {
     );
   };
 
-  // ── UPI / Netbanking: create order first, then open Razorpay Checkout. ──
+  // ── UPI / Netbanking: create order first, then open Cashfree Checkout. ──
   const submitGatewayOrder = async () => {
-
     if (!bank) return;
 
     setProcessingPayment(true);
 
     try {
-
-        const order = await new Promise<Awaited<ReturnType<typeof orders.create>>>(
-            (resolve, reject) => {
-
-                createMutation.mutate(
-                    {
-                        bankId: bank.id,
-                        bankName: bank.bankName,
-                        branchName: bank.branchName,
-                        gstNo: bank.gstNo,
-                        panNo: bank.panNo,
-                        address: bank.address,
-                        mobile: bank.mobile,
-                        email: bank.email,
-                        items: cart.map(i => ({
-                            productId: i.productId,
-                            quantity: i.quantity
-                        })),
-                        gstRate,
-                        paymentMethod:
-                            paymentMethod === "upi"
-                                ? "UPI"
-                                : "NETBANKING",
-                        upiId:
-                            paymentMethod === "upi"
-                                ? appSettings?.upiId
-                                : undefined,
-                    },
-                    {
-                        onSuccess: resolve,
-                        onError: reject,
-                    }
-                );
-
+      const order = await new Promise<Awaited<ReturnType<typeof orders.create>>>(
+        (resolve, reject) => {
+          createMutation.mutate(
+            {
+              bankId: bank.id,
+              bankName: bank.bankName,
+              branchName: bank.branchName,
+              gstNo: bank.gstNo,
+              panNo: bank.panNo,
+              address: bank.address,
+              mobile: bank.mobile,
+              email: bank.email,
+              items: cart.map((i) => ({
+                productId: i.productId,
+                quantity: i.quantity,
+              })),
+              gstRate,
+              paymentMethod: paymentMethod === 'upi' ? 'UPI' : 'NETBANKING',
+              upiId: paymentMethod === 'upi' ? appSettings?.upiId : undefined,
+            },
+            {
+              onSuccess: resolve,
+              onError: reject,
             }
-        );
+          );
+        }
+      );
 
-        const session =
-            await payments.createPaymentSession(order.id);
+      const session = await payments.createPaymentSession(order.id);
 
-        const cashfree = await load({
-            mode:
-                session.environment === "PRODUCTION"
-                    ? "production"
-                    : "sandbox",
-        });
+      if (!session?.paymentSessionId) {
+        throw new Error('Cashfree did not return a payment session.');
+      }
 
-               await cashfree?.checkout({
-               paymentSessionId: session.paymentSessionId,
-               redirectTarget: "_self",
-                });
+      const cashfree = await load({
+        mode: session.environment === 'PRODUCTION' ? 'production' : 'sandbox',
+      });
 
-                setProcessingPayment(false);
+      if (!cashfree) {
+        throw new Error('Unable to load Cashfree payment gateway.');
+      }
 
+      await cashfree.checkout({
+        paymentSessionId: session.paymentSessionId,
+        redirectTarget: '_self',
+      });
+
+      setProcessingPayment(false);
     } catch (e: any) {
+      setProcessingPayment(false);
 
-        setProcessingPayment(false);
-
-        toast({
-            title: "Payment Failed",
-            description:
-                e?.message ??
-                "Unable to start payment.",
-            variant: "destructive",
-        });
-
+      toast({
+        title: 'Payment Failed',
+        description: e?.message ?? 'Unable to start payment.',
+        variant: 'destructive',
+      });
     }
-    const submitOrder = () => {
-  if (paymentMethod === 'cod') {
-    submitCodOrder();
-  } else {
-    submitGatewayOrder();
-  }
-};
+  };
 
+  const submitOrder = () => {
+    if (paymentMethod === 'cod') {
+      submitCodOrder();
+    } else {
+      submitGatewayOrder();
+    }
+  };
 
   return (
     <div className="flex-1 p-6 lg:p-10 max-w-5xl mx-auto w-full">
@@ -384,5 +372,4 @@ export default function PlaceOrder() {
       )}
     </div>
   );
-  }
 }
