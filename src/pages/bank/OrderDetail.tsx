@@ -16,7 +16,6 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { load } from '@cashfreepayments/cashfree-js';
 
 function PaymentStatusPill({ status }: { status: string }) {
   const map: Record<
