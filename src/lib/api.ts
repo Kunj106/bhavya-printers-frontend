@@ -1,5 +1,8 @@
 // API service — connects to external Bhavya Printers Spring Boot backend
-const BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const BASE = (
+  import.meta.env.VITE_API_BASE_URL ||
+  'https://bhavya-printers-backend.onrender.com'
+).replace(/\/$/, '');
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('bp_token');
