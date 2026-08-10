@@ -140,6 +140,12 @@ export const auth = {
   bankRegister:          (data: BankRegisterInput) =>
     post<{ token: string; role: string; bank: Bank }>('/auth/bank/register', data),
 
+    sendEmailOtp: (email: string) =>
+    post<{ message: string }>('/auth/send-otp', { email }),
+
+  verifyEmailOtp: (email: string, otp: string) =>
+    post<{ message: string }>('/auth/verify-otp', { email, otp }),
+
   /**
    * Signs in an existing bank via Google. On success, returns the same
    * shape as bankLogin. If the Google account isn't linked to a bank yet,
