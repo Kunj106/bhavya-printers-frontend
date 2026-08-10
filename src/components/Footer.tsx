@@ -57,13 +57,14 @@ export function Footer() {
             <h3 className="font-semibold text-foreground">Contact</h3>
             <p className="text-sm text-muted-foreground">
 
-  Support:{' '}
   <a
-    href="mailto:bhavyaprinters21@gmail.com"
-    className="hover:text-primary transition-colors underline-offset-4 hover:underline"
-  >
-    bhavyaprinters21@gmail.com
-  </a>
+  href="https://mail.google.com/mail/?view=cm&fs=1&to=bhavyaprinters21@gmail.com"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="text-sm text-muted-foreground hover:text-primary transition-colors"
+>
+  bhavyaprinters21@gmail.com
+</a>
 </p>
 
             <p className="text-sm text-muted-foreground">Phone: +91 9825024751</p>
