@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,6 +32,10 @@ export default function Register() {
   const { login } = useAuth();
   const { toast } = useToast();
 
+  const [otp, setOtp] = useState('');
+const [otpSent, setOtpSent] = useState(false);
+const [verifiedEmail, setVerifiedEmail] = useState('');
+
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -47,6 +51,50 @@ export default function Register() {
     },
   });
 
+  const sendOtpMutation = useMutation({
+  mutationFn: (email: string) => auth.sendEmailOtp(email),
+
+  onSuccess: () => {
+    setOtpSent(true);
+    setVerifiedEmail('');
+
+    toast({
+      title: 'OTP Sent',
+      description: 'A verification OTP has been sent to your email.',
+    });
+  },
+
+  onError: (err: Error) => {
+    toast({
+      title: 'Failed to send OTP',
+      description: err.message,
+      variant: 'destructive',
+    });
+  },
+});
+
+const verifyOtpMutation = useMutation({
+  mutationFn: (data: { email: string; otp: string }) =>
+    auth.verifyEmailOtp(data.email, data.otp),
+
+  onSuccess: () => {
+    setVerifiedEmail(form.getValues('email'));
+
+    toast({
+      title: 'Email Verified',
+      description: 'Your email has been successfully verified.',
+    });
+  },
+
+  onError: (err: Error) => {
+    toast({
+      title: 'Verification failed',
+      description: err.message,
+      variant: 'destructive',
+    });
+  },
+});
+
   const mutation = useMutation({
     mutationFn: (data: BankRegisterInput) => auth.bankRegister(data),
     onSuccess: (data) => {
@@ -60,10 +108,18 @@ export default function Register() {
   });
 
   function onSubmit(values: z.infer<typeof registerSchema>) {
-    const { confirmPassword, ...submitData } = values;
-    mutation.mutate(submitData);
+  if (verifiedEmail !== values.email) {
+    toast({
+      title: 'Email not verified',
+      description: 'Please verify your email before registering.',
+      variant: 'destructive',
+    });
+    return;
   }
 
+  const { confirmPassword, ...submitData } = values;
+  mutation.mutate(submitData);
+}
   return (
     <div className="flex-1 flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-background">
       <div className="sm:mx-auto sm:w-full sm:max-w-xl">
@@ -128,13 +184,103 @@ export default function Register() {
               )} />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Official Email</FormLabel>
-                    <FormControl><Input type="email" placeholder="officer@bank.com" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+  control={form.control}
+  name="email"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Official Email</FormLabel>
+
+      <div className="flex gap-2">
+        <FormControl>
+          <Input
+            type="email"
+            placeholder="officer@bank.com"
+            {...field}
+            onChange={(e) => {
+              field.onChange(e);
+
+              // If email changes after verification,
+              // require verification again.
+              if (verifiedEmail && e.target.value !== verifiedEmail) {
+                setVerifiedEmail('');
+                setOtpSent(false);
+                setOtp('');
+              }
+            }}
+          />
+        </FormControl>
+
+        <Button
+          type="button"
+          variant="outline"
+          disabled={
+            !field.value ||
+            sendOtpMutation.isPending ||
+            verifiedEmail === field.value
+          }
+          onClick={() => {
+            sendOtpMutation.mutate(field.value);
+          }}
+        >
+          {sendOtpMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : verifiedEmail === field.value ? (
+            'Verified'
+          ) : (
+            'Send OTP'
+          )}
+        </Button>
+      </div>
+
+      <FormMessage />
+
+      {verifiedEmail === field.value && (
+        <p className="text-sm text-green-600 font-medium mt-1">
+          ✓ Email verified successfully
+        </p>
+      )}
+    </FormItem>
+  )}
+/>
+
+{otpSent && verifiedEmail !== form.watch('email') && (
+  <div className="sm:col-span-2">
+    <div className="flex gap-2 items-end">
+      <div className="flex-1">
+        <FormLabel>Enter OTP</FormLabel>
+
+        <Input
+          placeholder="Enter 6-digit OTP"
+          maxLength={6}
+          value={otp}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, '');
+            setOtp(value);
+          }}
+        />
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        disabled={otp.length !== 6 || verifyOtpMutation.isPending}
+        onClick={() => {
+          verifyOtpMutation.mutate({
+            email: form.getValues('email'),
+            otp,
+          });
+        }}
+      >
+        {verifyOtpMutation.isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          'Verify OTP'
+        )}
+      </Button>
+    </div>
+  </div>
+)}
                 <FormField control={form.control} name="mobile" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Mobile Number</FormLabel>
@@ -161,7 +307,15 @@ export default function Register() {
                 )} />
               </div>
 
-              <Button type="submit" className="w-full" size="lg" disabled={mutation.isPending}>
+              <Button
+  type="submit"
+  className="w-full"
+  size="lg"
+  disabled={
+    mutation.isPending ||
+    verifiedEmail !== form.getValues('email')
+  }
+>
                 {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Register Account
               </Button>
