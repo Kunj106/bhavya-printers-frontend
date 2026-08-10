@@ -215,31 +215,31 @@ const verifyOtpMutation = useMutation({
           type="button"
           variant="outline"
           disabled={
-            !field.value ||
-            sendOtpMutation.isPending ||
-            verifiedEmail === field.value
-          }
+          !field.value ||
+             sendOtpMutation.isPending ||
+           (verifiedEmail !== '' && verifiedEmail === field.value)
+       }
           onClick={() => {
             sendOtpMutation.mutate(field.value);
           }}
         >
           {sendOtpMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
-          ) : verifiedEmail === field.value ? (
-            'Verified'
+          ) : verifiedEmail !== '' && verifiedEmail === field.value ? (
+          'Verified'
           ) : (
-            'Send OTP'
-          )}
+         'Send OTP'
+      )}
         </Button>
       </div>
 
       <FormMessage />
 
-      {verifiedEmail === field.value && (
-        <p className="text-sm text-green-600 font-medium mt-1">
-          ✓ Email verified successfully
-        </p>
-      )}
+      {verifiedEmail !== '' && verifiedEmail === field.value && (
+      <p className="text-sm text-green-600 font-medium mt-1">
+       ✓ Email verified successfully
+      </p>
+   )}
     </FormItem>
   )}
 />
