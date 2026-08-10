@@ -32,13 +32,40 @@ export function Footer() {
           </div>
           <div className="flex flex-col gap-3">
             <h3 className="font-semibold text-foreground">Legal</h3>
-            <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms of Service</a>
-            <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Return Policy</a>
+            <Link
+  href="/terms"
+  className="text-sm text-muted-foreground hover:text-primary transition-colors"
+>
+  Terms of Service
+</Link>
+
+<Link
+  href="/privacy"
+  className="text-sm text-muted-foreground hover:text-primary transition-colors"
+>
+  Privacy Policy
+</Link>
+
+<Link
+  href="/returns"
+  className="text-sm text-muted-foreground hover:text-primary transition-colors"
+>
+  Returns & Refunds
+</Link>
           </div>
           <div className="flex flex-col gap-3 col-span-2 sm:col-span-1">
             <h3 className="font-semibold text-foreground">Contact</h3>
-            <p className="text-sm text-muted-foreground">Support: bhavyaprinters21@gmail.com</p>
+            <p className="text-sm text-muted-foreground">
+
+  Support:{' '}
+  <a
+    href="mailto:bhavyaprinters21@gmail.com"
+    className="hover:text-primary transition-colors underline-offset-4 hover:underline"
+  >
+    bhavyaprinters21@gmail.com
+  </a>
+</p>
+
             <p className="text-sm text-muted-foreground">Phone: +91 9825024751</p>
             <p className="text-sm text-muted-foreground mt-2">Bharuch, Gujarat, India</p>
           </div>

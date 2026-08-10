@@ -32,6 +32,10 @@ import AdminReports from '@/pages/admin/AdminReports';
 import AdminGstReport from '@/pages/admin/AdminGstReport';
 import AdminSettings from '@/pages/admin/AdminSettings';
 
+import TermsOfService from '@/pages/TermsOfService';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import ReturnPolicy from '@/pages/ReturnPolicy';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -68,6 +72,10 @@ function Router() {
           <Route path="/profile">
             <ProtectedRoute role="bank" component={BankProfile} />
           </Route>
+
+          <Route path="/terms" component={TermsOfService} />
+          <Route path="/privacy" component={PrivacyPolicy} />
+          <Route path="/returns" component={ReturnPolicy} />
 
           {/* Admin protected */}
           <Route path="/admin/dashboard">
