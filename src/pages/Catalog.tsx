@@ -147,7 +147,6 @@ function PackagePlaceholder() {
   return (
     <div className="text-muted-foreground/20 flex flex-col items-center">
       <ShoppingCart className="h-16 w-16 mb-2" />
-      <span className="text-xs font-medium tracking-wider uppercase">Image Coming Soon</span>
     </div>
   );
 }

@@ -547,10 +547,6 @@ export default function AdminLogin() {
             Register here
           </a>
         </div>
-
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Bhavya Printers &mdash; Internal Administration System
-        </p>
       </div>
     </div>
   );
