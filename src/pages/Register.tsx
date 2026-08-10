@@ -248,7 +248,9 @@ const verifyOtpMutation = useMutation({
   <div className="sm:col-span-2">
     <div className="flex gap-2 items-end">
       <div className="flex-1">
-        <FormLabel>Enter OTP</FormLabel>
+        <label className="text-sm font-medium leading-none">
+         Enter OTP
+         </label>
 
         <Input
           placeholder="Enter 6-digit OTP"
