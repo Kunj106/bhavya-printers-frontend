@@ -238,6 +238,7 @@ export const orders = {
   get:           (id: number)                   => get<Order>(`/orders/${id}`),
   create:        (data: OrderInput)             => post<Order>('/orders', data),
   updateStatus:  (id: number, status: string)   => put<Order>(`/orders/${id}/status`, { status }),
+  delete:        (id: number)                   => del<{ message: string; orderId: number }>(`/orders/${id}`),
   byBank:        (bankId: number)               => get<Order[]>(`/orders/bank/${bankId}`),
 };
 
@@ -255,6 +256,8 @@ export const payments = {
       `/payments/create/${orderId}`,
       {}
     ),
+      markPaidManually: (orderId: number) =>
+    post(`/payments/${orderId}/mark-paid`, {}),
 };
 
 // ─── Analytics ───────────────────────────────────────────────────────────────

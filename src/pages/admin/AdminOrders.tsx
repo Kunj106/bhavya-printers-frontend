@@ -7,7 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ShoppingBag, Search, ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import {
+  Loader2,
+  ShoppingBag,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Trash2,
+} from 'lucide-react';
 import { format } from 'date-fns';
 
 function PaymentStatusBadge({ status }: { status: string }) {
@@ -34,6 +44,38 @@ export default function AdminOrders() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [markingPaidId, setMarkingPaidId] = useState<number | null>(null);
+  const deleteOrder = useMutation({
+  mutationFn: (id: number) => orders.delete(id),
+
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: ['orders'] });
+
+    toast({
+      title: 'Order deleted',
+      description: 'The order has been permanently deleted.',
+    });
+  },
+
+  onError: (e: Error) => {
+    toast({
+      title: 'Delete failed',
+      description: e.message,
+      variant: 'destructive',
+    });
+  },
+});
+
+const handleDeleteOrder = (id: number) => {
+  const confirmed = window.confirm(
+    `Are you sure you want to delete Order #${id}?\n\nThis action cannot be undone.`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  deleteOrder.mutate(id);
+};
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => orders.updateStatus(id, status),
@@ -116,6 +158,7 @@ export default function AdminOrders() {
                   <th className="px-4 py-3 font-semibold">Payment</th>
                   <th className="px-4 py-3 font-semibold">Payment Status</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -183,10 +226,32 @@ export default function AdminOrders() {
                           </SelectContent>
                         </Select>
                       </td>
+
+                      <td
+  className="px-4 py-3 text-center"
+  onClick={(e) => e.stopPropagation()}
+>
+  <Button
+    type="button"
+    variant="outline"
+    size="icon"
+    className="h-8 w-8 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+    onClick={() => handleDeleteOrder(o.id)}
+    disabled={deleteOrder.isPending}
+    title={`Delete Order #${o.id}`}
+  >
+    {deleteOrder.isPending ? (
+      <Loader2 className="h-4 w-4 animate-spin" />
+    ) : (
+      <Trash2 className="h-4 w-4" />
+    )}
+  </Button>
+</td>
+
                     </tr>
                     {expandedId === o.id && (
                       <tr className="bg-muted/20 border-t border-dashed border-border">
-                        <td colSpan={8} className="px-6 py-4">
+                        <td colSpan={9} className="px-6 py-4">
                           <div className="space-y-3">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Order Items</p>
                             <div className="space-y-1">
